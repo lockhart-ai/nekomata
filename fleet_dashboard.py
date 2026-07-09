@@ -416,6 +416,9 @@ def parse_session(path: Path, modified_at: float, project_name: str,
         "awaiting": detect_awaiting(tail_entries),
         "pending_tasks": pending_background_tasks(tail_entries),
         "is_self": session_id == OWN_SESSION_ID,
+        # a stub (only ai-title / agent-name metadata, no timestamped messages)
+        # is a not-yet-started session, not a live cat
+        "has_activity": last_activity is not None,
     }
 
 
@@ -487,6 +490,8 @@ def sample_sessions() -> None:
                     continue
                 session = parse_session(
                     transcript, modified_at, project_directory.name, parent_id)
+                if not session["has_activity"]:
+                    continue  # session stub with no real conversation yet
                 if (session["pending_tasks"] and not parent_id
                         and now - session["modified_at"] > TASK_LIVENESS_GRACE_SECONDS
                         and not background_tasks_alive(
