@@ -8,7 +8,9 @@ on:
 
 jobs:
   vsix:
-    runs-on: macos-latest
+    # The extension runtime is macOS-only, but packaging a .vsix is just
+    # Node + a Python syntax check — so it builds fine (and faster) on Linux.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 

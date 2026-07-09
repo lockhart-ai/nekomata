@@ -547,7 +547,77 @@ def prune_dead_sessions(sessions: list[dict], live_claude_count: int,
             if session["id"] in keep or session["parent_id"] in keep]
 
 
+DEMO_MODE = False
+
+
+def demo_event(now: float, seconds_ago: float, tool: str, detail: str,
+               sidechain: bool = False) -> dict:
+    stamp = datetime.fromtimestamp(now - seconds_ago).astimezone().isoformat()
+    return {"time": stamp, "tool": tool, "detail": detail, "sidechain": sidechain}
+
+
+def build_demo_snapshot() -> dict:
+    """A curated synthetic scene (one cat per state) for previews / the README.
+    Served only under --demo; needs no real processes, docker, or transcripts."""
+    now = time.time()
+
+    def cat(session_id, branch, ago, awaiting, pending, events, parent=""):
+        return {
+            "id": session_id, "parent_id": parent, "project": "you/project",
+            "title": "", "branch": branch, "model": "claude-sonnet",
+            "events": events, "modified_at": now - ago,
+            "awaiting": awaiting, "pending_tasks": pending, "is_self": False,
+        }
+
+    sessions = [
+        cat("demo-working-a3", "fix-auth-timeout", 4, "model", 0,
+            [demo_event(now, 4, "Edit", "penny/auth/session.py")]),
+        cat("demo-waiting-b7", "flaky-test-retry-loop", 95, "user", 2,
+            [demo_event(now, 95, "Bash", "pytest -x tests/test_flaky.py")]),
+        cat("demo-asking-c5", "reword-error-messages", 22, "user", 0,
+            [demo_event(now, 22, "say", "Which tone — playful or matter-of-fact?")]),
+        cat("demo-asleep-d4", "nightly-benchmarks", 720, "user", 0,
+            [demo_event(now, 720, "say", "Benchmarks done — all green.")]),
+        cat("demo-working-e8", "index-embeddings", 8, "tool", 0,
+            [demo_event(now, 8, "Bash", "make embed-index")]),
+        cat("demo-kit-work-1", "", 6, "model", 0,
+            [demo_event(now, 6, "Grep", "def authenticate(", True)], "demo-working-a3"),
+        cat("demo-kit-work-2", "", 3, "tool", 0,
+            [demo_event(now, 3, "Read", "penny/auth/tokens.py", True)], "demo-working-a3"),
+        cat("demo-kit-play-3", "", 430, "user", 0,
+            [demo_event(now, 430, "say", "done", True)], "demo-working-a3"),
+        cat("demo-kit-work-4", "", 5, "model", 0,
+            [demo_event(now, 5, "Edit", "similarity/embeddings.py", True)], "demo-working-e8"),
+    ]
+    docker = [
+        {"name": "signal-api", "status": "Up 3h", "cpu": 46.0, "memory": "180MiB / 2GiB"},
+        {"name": "penny", "status": "Up 3h", "cpu": 78.0, "memory": "420MiB / 4GiB"},
+        {"name": "team-worker", "status": "Up 1h", "cpu": 12.0, "memory": "90MiB / 2GiB"},
+        {"name": "ollama", "status": "Up 3h", "cpu": 4.0, "memory": "1.1GiB / 8GiB"},
+    ]
+    trees = [{
+        "pid": 1000, "elapsed": "12:34", "cpu": 320.0, "rss_mb": 900,
+        "process_count": 8, "rows": [
+            {"pid": 1, "depth": 1, "cpu": 180.0, "elapsed": "03:20", "is_wrapper": True,
+             "command": "EVAL_SAMPLES=5 make eval EVAL_PYTEST_ARGS=tests/eval"},
+            {"pid": 2, "depth": 1, "cpu": 90.0, "elapsed": "01:12", "is_wrapper": True,
+             "command": "pytest -x tests/test_flaky.py"},
+            {"pid": 3, "depth": 1, "cpu": 40.0, "elapsed": "00:40", "is_wrapper": True,
+             "command": "make embed-index"},
+        ],
+    }]
+    history = [{"t": now - (5 - i), "claude": 4.6, "docker": 1.4, "total": 7.3}
+               for i in range(5)]
+    return {
+        "generated_at": now, "server_started": SERVER_STARTED, "cpu_count": 10,
+        "gpu": 88, "trees": trees, "docker": docker,
+        "sessions": sessions, "history": history,
+    }
+
+
 def snapshot() -> dict:
+    if DEMO_MODE:
+        return build_demo_snapshot()
     with STATE.lock:
         return {
             "generated_at": time.time(),
@@ -1823,20 +1893,27 @@ overlay.addEventListener("mouseout", (event) => {
 
 
 def main() -> None:
+    global DEMO_MODE
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8787)
+    parser.add_argument("--demo", action="store_true",
+                        help="serve a fixed synthetic scene (for previews); "
+                             "samples no real processes, docker, or transcripts")
     arguments = parser.parse_args()
-    for sample_function, interval in (
-        (sample_processes, PROCESS_SAMPLE_SECONDS),
-        (sample_docker, DOCKER_SAMPLE_SECONDS),
-        (sample_sessions, SESSION_SAMPLE_SECONDS),
-        (sample_gpu, GPU_SAMPLE_SECONDS),
-    ):
-        thread = threading.Thread(
-            target=run_sampler, args=(sample_function, interval), daemon=True)
-        thread.start()
+    DEMO_MODE = arguments.demo
+    if not DEMO_MODE:
+        for sample_function, interval in (
+            (sample_processes, PROCESS_SAMPLE_SECONDS),
+            (sample_docker, DOCKER_SAMPLE_SECONDS),
+            (sample_sessions, SESSION_SAMPLE_SECONDS),
+            (sample_gpu, GPU_SAMPLE_SECONDS),
+        ):
+            thread = threading.Thread(
+                target=run_sampler, args=(sample_function, interval), daemon=True)
+            thread.start()
     server = ThreadingHTTPServer(("127.0.0.1", arguments.port), DashboardHandler)
-    print(f"Cat cafe: http://localhost:{arguments.port}")
+    print(f"Nekomata{' (demo)' if DEMO_MODE else ''}: "
+          f"http://localhost:{arguments.port}")
     server.serve_forever()
 
 

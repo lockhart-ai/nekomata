@@ -8,6 +8,13 @@ pastry case. It docks in a panel next to your terminals and updates live.
 Named for the *nekomata* — the two-tailed cat of Japanese folklore — because a fleet of
 agents is a fleet of many-tailed cats.
 
+![Nekomata cat cafe](docs/preview.png)
+
+*Above: a demo scene. From left — a sleeping cat, a working cat with three kittens (two
+working with speech bubbles, one chasing yarn), another working cat, a cat raising its
+paw with a question, and a cat sipping coffee while it waits on background tasks. Run it
+yourself with `python3 fleet_dashboard.py --demo`.*
+
 ## What you see
 
 - **Cats** — each top-level Claude Code session, named by its git branch or task, on a
