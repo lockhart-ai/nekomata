@@ -283,14 +283,28 @@ def describe_tool_input(tool_input: dict) -> str:
                  if isinstance(value, str) and value.strip()), "")
 
 
-def session_title(head_entries: list[dict]) -> str:
+CONTINUATION_PREFIX = "This session is being continued"
+
+
+def session_title(head_entries: list[dict], tail_entries: list[dict]) -> str:
+    # Claude Code's generated display name is the cleanest label for a session.
+    # It's (re)written as the conversation evolves, so the freshest copy is in
+    # the tail; fall back to the head for short sessions.
+    for entry in reversed(tail_entries):
+        if entry.get("type") == "ai-title" and entry.get("aiTitle"):
+            return entry["aiTitle"].strip()
+    for entry in head_entries:
+        if entry.get("type") == "ai-title" and entry.get("aiTitle"):
+            return entry["aiTitle"].strip()
     for entry in head_entries:
         if entry.get("type") == "summary" and entry.get("summary"):
-            return entry["summary"]
+            return entry["summary"].strip()
     for entry in head_entries:
         if entry.get("type") == "user" and isinstance(entry.get("message"), dict):
             text = extract_text_content(entry["message"]).strip()
-            if text and not text.startswith("<"):
+            # skip XML/system framing and compaction "continued from…" blurbs
+            if text and not text.startswith("<") \
+                    and not text.startswith(CONTINUATION_PREFIX):
                 return text.split("\n")[0]
     return ""
 
@@ -405,7 +419,7 @@ def parse_session(path: Path, modified_at: float, project_name: str,
         "id": session_id,
         "parent_id": parent_id,
         "project": project_name.lstrip("-").replace("-", "/"),
-        "title": session_title(head_entries),
+        "title": session_title(head_entries, tail_entries),
         "branch": branch,
         "model": model,
         "events": events,
