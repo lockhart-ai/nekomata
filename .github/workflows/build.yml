@@ -6,6 +6,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# needed so the tagged-release step can create a release + upload the .vsix
+permissions:
+  contents: write
+
 jobs:
   vsix:
     # The extension runtime is macOS-only, but packaging a .vsix is just
