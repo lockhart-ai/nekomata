@@ -6,6 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 cp fleet_dashboard.py extension/fleet_dashboard.py
+rm -rf extension/web && cp -r web extension/web
 cp LICENSE extension/LICENSE
 
 cd extension

@@ -18,9 +18,10 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Sanity-check the server and extension
+      - name: Sanity-check the server, page, and extension
         run: |
           python3 -c "import ast; ast.parse(open('fleet_dashboard.py').read())"
+          node --check web/app.js
           node --check extension/extension.js
 
       - name: Build the .vsix
