@@ -1,0 +1,5 @@
+# copied into the extension at build time; the repo root holds the source of truth
+extension/fleet_dashboard.py
+extension/LICENSE
+# build output
+*.vsix
