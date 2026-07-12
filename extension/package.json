@@ -2,7 +2,7 @@
   "name": "nekomata",
   "displayName": "Nekomata",
   "description": "A pixel-art cat cafe that visualizes your running Claude Code sessions, subagents, and CPU/GPU/Docker load as cats.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "lockhart-ai",
   "license": "MIT",
   "repository": {
