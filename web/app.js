@@ -786,11 +786,25 @@ function resolveBubbleCollisions() {
   }
 }
 
+function shortenDetail(text) {
+  // when the whole detail is a lone filesystem path, show just the filename —
+  // "/Users/decker/…/session.py" is noise; "session.py" is the useful part.
+  // (the hover card still carries the full path.)
+  const trimmed = text.trim();
+  if (trimmed && !/\s/.test(trimmed) && trimmed.includes("/")
+      && !trimmed.includes("://")) {
+    const name = trimmed.replace(/\/+$/, "").split("/").pop();
+    if (name) return name;
+  }
+  return text;
+}
+
 function bubbleHtml(event, status) {
   if (status === "idle") return `<span class="icon">\u{1F4A4}</span>zzz`;
   if (!event) return "";
   const icon = TOOL_ICONS[event.tool] || "⚙️";
-  return `<span class="icon">${icon}</span>${escapeHtml(event.detail || event.tool)}`;
+  const detail = event.detail ? shortenDetail(event.detail) : event.tool;
+  return `<span class="icon">${icon}</span>${escapeHtml(detail)}`;
 }
 
 const BUBBLE_TTL_SECONDS = 180;
