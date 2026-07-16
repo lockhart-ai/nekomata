@@ -167,6 +167,13 @@ let knownCatInfo = null;
 // idle kittens free-roam and play fetch-with-themselves: whack the yarn ball,
 // chase it, whack it again. kitten id → play state.
 const kittenPlay = new Map();
+// vimium-style keyboard hint state
+const HINT_KEYS = "asdfghjklqwertyuiopzxcvbnm";
+let hintsActive = false;
+let hintContainer = null;
+// roving tabindex: track which cat/kitten owns tabindex="0"
+let rovingSid = null;
+let overlayHasFocus = false;
 
 function computeSpots(count) {
   // Cats spread evenly BOTH ways: a diagonal from upper-left to lower-right,
@@ -239,6 +246,27 @@ function drawBitmap(rows, x, y, scale, colors) {
 }
 
 function rect(x, y, w, h, color) { context.fillStyle = color; context.fillRect(x, y, w, h); }
+
+function drawSpriteOutline(rows, x, y, scale) {
+  const color = "#fffdf7";
+  const h = rows.length, w = rows[0].length;
+  const solid = (r, c) => r >= 0 && r < h && c >= 0 && c < w && rows[r][c] !== ".";
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      if (rows[r][c] !== ".") continue;
+      if (solid(r - 1, c) || solid(r + 1, c) || solid(r, c - 1) || solid(r, c + 1))
+        rect(x + c * scale, y + r * scale, scale, scale, color);
+    }
+  }
+  for (let r = 0; r < h; r++) {
+    if (rows[r][0] !== ".") rect(x - scale, y + r * scale, scale, scale, color);
+    if (rows[r][w - 1] !== ".") rect(x + w * scale, y + r * scale, scale, scale, color);
+  }
+  for (let c = 0; c < w; c++) {
+    if (rows[0][c] !== ".") rect(x + c * scale, y - scale, scale, scale, color);
+    if (rows[h - 1][c] !== ".") rect(x + c * scale, y + h * scale, scale, scale, color);
+  }
+}
 
 function shade(hex) {
   const n = parseInt(hex.slice(1), 16);
@@ -633,8 +661,11 @@ function drawSpotWithCat(slot, session, now) {
   }
   const shake = startled ? (frame % 2 ? 2 : -2) : 0;
   const bob = status === "working" && !waiting && frame % 2 ? 1 : 0;
-  drawBitmap(rows, geometry.catCenterX - 24 + shake,
-    geometry.catBottom - rows.length * 3 + bob, 3,
+  const spriteX = geometry.catCenterX - 24 + shake;
+  const spriteY = geometry.catBottom - rows.length * 3 + bob;
+  if (overlayHasFocus && rovingSid === session.id)
+    drawSpriteOutline(rows, spriteX, spriteY, 3);
+  drawBitmap(rows, spriteX, spriteY, 3,
     {S: accent, T: shade(accent), K: "#141412", P: "#f0937e", W: "#fffdf7"});
   if (startled) {
     const markX = geometry.catCenterX + 32;
@@ -714,8 +745,11 @@ function drawScene() {
       const yarnColor = KITTEN_YARN_COLORS[index % KITTEN_YARN_COLORS.length];
       if (working) {
         kittenPlay.delete(kitten.id);
-        drawBitmap(KITTEN, place.centerX - 12,
-          place.bottom - KITTEN.length * 3 + (frame % 2 ? 2 : 0), 3, kittenColors);
+        const kx = place.centerX - 12;
+        const ky = place.bottom - KITTEN.length * 3 + (frame % 2 ? 2 : 0);
+        if (overlayHasFocus && rovingSid === kitten.id)
+          drawSpriteOutline(KITTEN, kx, ky, 3);
+        drawBitmap(KITTEN, kx, ky, 3, kittenColors);
         const batted = ((frame + index) % 3) - 1;
         const hop = (frame + index) % 2 ? 2 : 0;
         drawMiniYarn(place.centerX - 4 + batted * 5, place.bottom - 4 - hop, yarnColor);
@@ -729,8 +763,11 @@ function drawScene() {
         }
         advanceKittenPlay(play);
         drawMiniYarn(play.ballX - 4, play.ballY - 4, yarnColor);
-        drawBitmap(KITTEN, play.x - 12,
-          play.y - KITTEN.length * 3 + (frame % 2 ? 1 : 0), 3, kittenColors);
+        const kx = play.x - 12;
+        const ky = play.y - KITTEN.length * 3 + (frame % 2 ? 1 : 0);
+        if (overlayHasFocus && rovingSid === kitten.id)
+          drawSpriteOutline(KITTEN, kx, ky, 3);
+        drawBitmap(KITTEN, kx, ky, 3, kittenColors);
       }
     });
   }
@@ -869,7 +906,9 @@ function renderOverlay(data) {
     const catHover = hoverData(session, now);
     const catBox = scenePosition(geometry.catCenterX - 26, geometry.catBottom - 58);
     const catBoxEnd = scenePosition(geometry.catCenterX + 26, geometry.catBottom + 4);
-    pieces.push(`<div class="hover-target"` +
+    pieces.push(`<div class="hover-target" tabindex="-1"` +
+      ` role="button" aria-label="${escapeHtml(sessionName(session))}"` +
+      ` data-sid="${escapeHtml(session.id)}"` +
       ` style="left:${catBox.left}px;top:${catBox.top}px;` +
       `width:${catBoxEnd.left - catBox.left}px;height:${catBoxEnd.top - catBox.top}px"` +
       ` data-name="${escapeHtml(sessionName(session))}"` +
@@ -890,7 +929,10 @@ function renderOverlay(data) {
       const kittenHover = hoverData(kitten, now);
       const hoverBox = scenePosition(kittenX - 14, kittenY - 24);
       const hoverBoxEnd = scenePosition(kittenX + 14, kittenY + 4);
-      pieces.push(`<div class="hover-target"` +
+      pieces.push(`<div class="hover-target" tabindex="-1"` +
+        ` role="button" aria-label="⑂ ${escapeHtml(kittenLabel(kitten))}"` +
+        ` data-sid="${escapeHtml(kitten.id)}"` +
+        (working ? "" : ` data-kitten-id="${escapeHtml(kitten.id)}"`) +
         ` style="left:${hoverBox.left}px;top:${hoverBox.top}px;` +
         `width:${hoverBoxEnd.left - hoverBox.left}px;` +
         `height:${hoverBoxEnd.top - hoverBox.top}px"` +
@@ -927,9 +969,18 @@ function renderOverlay(data) {
   if (!data.sessions.length)
     pieces.push(`<div class="empty-office">The cafe is empty — no cats working` +
       ` in the last 15 minutes.</div>`);
+  const focusedTarget = document.activeElement?.closest(".hover-target");
+  const focusedSid = focusedTarget?.dataset.sid;
   overlay.innerHTML = pieces.join("");
+  applyRovingTabindex();
+  if (focusedSid) {
+    const restored = overlay.querySelector(
+      `.hover-target[data-sid="${CSS.escape(focusedSid)}"]`);
+    if (restored) restored.focus({preventScroll: true});
+  }
   clampBubblesToView();
   resolveBubbleCollisions();
+  refreshHints();
 }
 
 function clampBubblesToView() {
@@ -1112,8 +1163,24 @@ refresh();
 // but rAF always runs while the page is actually visible.
 let lastFrameAt = 0;
 let lastRefreshAt = 0;
+function updateMovingTargets() {
+  for (const target of overlay.querySelectorAll("[data-kitten-id]")) {
+    const play = kittenPlay.get(target.dataset.kittenId);
+    if (!play) continue;
+    const box = scenePosition(play.x - 14, play.y - 24);
+    const boxEnd = scenePosition(play.x + 14, play.y + 4);
+    target.style.left = box.left + "px";
+    target.style.top = box.top + "px";
+    target.style.width = (boxEnd.left - box.left) + "px";
+    target.style.height = (boxEnd.top - box.top) + "px";
+  }
+  if (hintsActive) refreshHints();
+}
+
 function pump(now) {
-  if (now - lastFrameAt >= 320) { lastFrameAt = now; frame++; drawScene(); }
+  if (now - lastFrameAt >= 320) {
+    lastFrameAt = now; frame++; drawScene(); updateMovingTargets();
+  }
   if (now - lastRefreshAt >= 1000) { lastRefreshAt = now; refresh(); }
   requestAnimationFrame(pump);
 }
@@ -1124,11 +1191,9 @@ document.addEventListener("visibilitychange", () => {
 // Low-frequency backstop in case rAF is ever suspended while still visible.
 setInterval(refresh, 10000);
 
-// Hover a cat or kitten to see its full last message.
+// Hover or focus a cat/kitten to see its full last message.
 const hovercard = document.getElementById("hovercard");
-overlay.addEventListener("mouseover", (event) => {
-  const target = event.target.closest(".hover-target");
-  if (!target) return;
+function showHovercard(target) {
   hovercard.innerHTML =
     `<span class="who">${escapeHtml(target.dataset.name)}</span>` +
     `<span class="when">${escapeHtml(target.dataset.when)}</span><br>` +
@@ -1139,7 +1204,159 @@ overlay.addEventListener("mouseover", (event) => {
   hovercard.style.left =
     Math.max(8, Math.min(window.innerWidth - cardWidth - 8, box.left)) + "px";
   hovercard.style.top = Math.max(8, box.top - hovercard.offsetHeight - 8) + "px";
+}
+overlay.addEventListener("mouseover", (event) => {
+  const target = event.target.closest(".hover-target");
+  if (target) showHovercard(target);
 });
 overlay.addEventListener("mouseout", (event) => {
   if (event.target.closest(".hover-target")) hovercard.style.display = "none";
+});
+// ------------------------------------------------------------ roving tabindex
+function applyRovingTabindex() {
+  const targets = overlay.querySelectorAll(".hover-target");
+  if (!targets.length) return;
+  let activeFound = false;
+  for (const t of targets) {
+    if (t.dataset.sid === rovingSid) {
+      t.setAttribute("tabindex", "0");
+      activeFound = true;
+    } else {
+      t.setAttribute("tabindex", "-1");
+    }
+  }
+  if (!activeFound) {
+    targets[0].setAttribute("tabindex", "0");
+    rovingSid = targets[0].dataset.sid;
+  }
+}
+
+function centerOf(el) {
+  const r = el.getBoundingClientRect();
+  return {x: r.left + r.width / 2, y: r.top + r.height / 2};
+}
+
+function rovingMove(direction) {
+  const targets = [...overlay.querySelectorAll(".hover-target")];
+  if (!targets.length) return;
+  const currentIdx = targets.findIndex((t) => t.dataset.sid === rovingSid);
+  if (currentIdx < 0) return;
+  const origin = centerOf(targets[currentIdx]);
+  let best = -1, bestDist = Infinity;
+  for (let i = 0; i < targets.length; i++) {
+    if (i === currentIdx) continue;
+    const c = centerOf(targets[i]);
+    const dx = c.x - origin.x, dy = c.y - origin.y;
+    let inDirection = false;
+    if (direction === "left")  inDirection = dx < -8;
+    if (direction === "right") inDirection = dx > 8;
+    if (direction === "up")    inDirection = dy < -8;
+    if (direction === "down")  inDirection = dy > 8;
+    if (!inDirection) continue;
+    const primaryDist = (direction === "left" || direction === "right")
+      ? Math.abs(dx) : Math.abs(dy);
+    const crossDist = (direction === "left" || direction === "right")
+      ? Math.abs(dy) : Math.abs(dx);
+    const dist = primaryDist + crossDist * 2;
+    if (dist < bestDist) { bestDist = dist; best = i; }
+  }
+  if (best < 0) return;
+  rovingSid = targets[best].dataset.sid;
+  for (const t of targets) t.setAttribute("tabindex", "-1");
+  targets[best].setAttribute("tabindex", "0");
+  targets[best].focus({preventScroll: true});
+  drawScene();
+}
+
+// ------------------------------------------------------------ vimium-style hints
+function refreshHints() {
+  if (hintContainer) { hintContainer.remove(); hintContainer = null; }
+  if (!hintsActive) return;
+  const targets = [...overlay.querySelectorAll(".hover-target")];
+  if (!targets.length) { hintsActive = false; return; }
+  hintContainer = document.createElement("div");
+  hintContainer.id = "hint-overlay";
+  hintContainer.setAttribute("aria-live", "polite");
+  hintContainer.setAttribute("aria-label",
+    "Keyboard hints active. Press a letter to jump to a cat.");
+  document.body.appendChild(hintContainer);
+  targets.forEach((target, i) => {
+    if (i >= HINT_KEYS.length) return;
+    const key = HINT_KEYS[i];
+    const box = target.getBoundingClientRect();
+    const hint = document.createElement("span");
+    hint.className = "hint-badge";
+    hint.textContent = key.toUpperCase();
+    hint.dataset.hintKey = key;
+    hint.style.left = (box.left + box.width / 2) + "px";
+    hint.style.top = (box.top + box.height / 2) + "px";
+    hintContainer.appendChild(hint);
+  });
+}
+
+function showHints() {
+  hintsActive = true;
+  refreshHints();
+}
+
+function dismissHints() {
+  hintsActive = false;
+  refreshHints();
+}
+
+function activateHint(key) {
+  const targets = [...overlay.querySelectorAll(".hover-target")];
+  const index = HINT_KEYS.indexOf(key);
+  if (index >= 0 && index < targets.length) {
+    dismissHints();
+    rovingSid = targets[index].dataset.sid;
+    applyRovingTabindex();
+    targets[index].focus({preventScroll: true});
+    drawScene();
+  }
+}
+
+overlay.addEventListener("focusin", (event) => {
+  const target = event.target.closest(".hover-target");
+  if (target && target.dataset.sid) {
+    rovingSid = target.dataset.sid;
+    overlayHasFocus = true;
+    applyRovingTabindex();
+    showHovercard(target);
+    drawScene();
+  }
+});
+overlay.addEventListener("focusout", (event) => {
+  if (event.target.closest(".hover-target")) {
+    overlayHasFocus = false;
+    hovercard.style.display = "none";
+    drawScene();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
+  if (hintsActive) {
+    event.preventDefault();
+    if (event.key === "Escape") { dismissHints(); return; }
+    const key = event.key.toLowerCase();
+    if (HINT_KEYS.includes(key)) activateHint(key);
+    return;
+  }
+  const inOverlay = event.target.closest(".hover-target");
+  if (inOverlay) {
+    const dirMap = {ArrowRight: "right", ArrowLeft: "left",
+                    ArrowUp: "up", ArrowDown: "down"};
+    if (dirMap[event.key]) {
+      event.preventDefault(); rovingMove(dirMap[event.key]);
+    }
+  }
+  if (event.key === "f" && !event.ctrlKey && !event.metaKey && !event.altKey && !inOverlay) {
+    event.preventDefault();
+    showHints();
+  }
+  if (event.key === "Escape") {
+    hovercard.style.display = "none";
+    document.activeElement?.blur();
+  }
 });
