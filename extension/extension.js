@@ -97,30 +97,64 @@ function cafeHtml(port) {
 <body>
 <iframe id="cafe" src="${origin}/"></iframe>
 <script>
-  // Watchdog: if the server goes away and comes back (restart, sleep/wake), the
-  // iframe can be left on a dead error page with no JS running. Ping the server
-  // and reload the iframe when it recovers.
+  // Watchdog. The iframe's content process can be evicted or crash while the
+  // server stays healthy, leaving a blank panel that only a manual webview
+  // reload fixed. So liveness is measured on the IFRAME (it acks every render),
+  // not on the server — plus a server ping to recover from restarts/sleep.
   const cafe = document.getElementById("cafe");
+  const STALE_MS = 10000;
+  const RELOAD_COOLDOWN_MS = 15000;
+  let lastAliveAt = Date.now();
+  let lastReloadAt = Date.now();
+  let pushesSinceAlive = 0;
+
+  function reviveCafe(reason) {
+    if (Date.now() - lastReloadAt < RELOAD_COOLDOWN_MS) return;
+    lastReloadAt = Date.now();
+    lastAliveAt = Date.now();
+    pushesSinceAlive = 0;
+    cafe.src = "${origin}/?revive=" + Date.now() + "&why=" + reason;
+  }
+
   // Relay data pushed by the extension host into the cafe iframe.
   window.addEventListener("message", (event) => {
     const message = event.data;
-    if (message && message.type === "catCafeData" && cafe.contentWindow)
+    if (!message) return;
+    if (message.type === "catCafeAlive") {
+      lastAliveAt = Date.now();
+      pushesSinceAlive = 0;
+      return;
+    }
+    if (message.type === "catCafeData" && cafe.contentWindow) {
+      pushesSinceAlive++;
       cafe.contentWindow.postMessage(message, "${origin}");
+    }
   });
-  let consecutiveFailures = 0;
+
   setInterval(async () => {
+    // only judge staleness when we've actually been feeding it frames
+    if (pushesSinceAlive >= 5 && Date.now() - lastAliveAt > STALE_MS) {
+      reviveCafe("stale");
+      return;
+    }
     try {
       const controller = new AbortController();
       setTimeout(() => controller.abort(), 2000);
       const response = await fetch("${origin}/data",
         {cache: "no-store", signal: controller.signal});
       if (!response.ok) throw new Error("bad status");
-      if (consecutiveFailures >= 2) cafe.src = "${origin}/?revive=" + Date.now();
-      consecutiveFailures = 0;
     } catch (error) {
-      consecutiveFailures++;
+      // server unreachable (restart / sleep-wake): once it answers again the
+      // staleness check above brings the frame back
     }
   }, 3000);
+
+  // coming back into view is the moment a discarded frame is most likely dead
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && pushesSinceAlive >= 5
+        && Date.now() - lastAliveAt > STALE_MS)
+      reviveCafe("visible");
+  });
 </script>
 </body>
 </html>`;

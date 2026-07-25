@@ -1070,6 +1070,14 @@ window.addEventListener("message", (event) => {
     consume(message.data, "push");
     frame++;
     drawScene();
+    // Tell the wrapper this frame is alive and rendering. If these stop
+    // arriving the wrapper reloads us — the iframe's content process can be
+    // evicted or crash while the server stays perfectly healthy, and nothing
+    // else would notice.
+    try {
+      if (window.parent !== window)
+        window.parent.postMessage({type: "catCafeAlive"}, "*");
+    } catch (error) {}
   }
 });
 
