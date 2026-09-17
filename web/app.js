@@ -161,9 +161,11 @@ const canvas = document.getElementById("scene");
 const context = canvas.getContext("2d");
 
 function fitSceneToViewport() {
-  // Widen the logical scene to the viewport's aspect ratio. Left-side props
-  // keep their coordinates; right-side props are placed from the right edge
-  // at draw time; the board slides half the extra width so it stays centred.
+  // Widen the logical scene to the viewport's aspect ratio. Floor props keep
+  // their coordinates on the left or are placed from the right edge at draw
+  // time. The wall props (window, pastry case, board, espresso machine) move
+  // together by half the extra width, so the group stays centred with its
+  // original arrangement intact.
   const box = canvas.getBoundingClientRect();
   if (!box.width || !box.height) return false;
   const wanted = Math.min(SCENE_W_MAX,
@@ -171,9 +173,11 @@ function fitSceneToViewport() {
   if (wanted === sceneW) return false;
   sceneW = wanted;
   canvas.width = sceneW;
-  const extra = sceneW - SCENE_W;
-  COFFEE.x = COFFEE_BASE_X + extra;
-  BOARD.x = BOARD_BASE_X + Math.round(extra / 2);
+  const wallShift = Math.round((sceneW - SCENE_W) / 2);
+  WINDOW.x = WINDOW_BASE_X + wallShift;
+  CASE.x = CASE_BASE_X + wallShift;
+  BOARD.x = BOARD_BASE_X + wallShift;
+  COFFEE.x = COFFEE_BASE_X + wallShift;
   return true;
 }
 const overlay = document.getElementById("overlay");
@@ -317,7 +321,8 @@ function drawCake(x, y, color, busy) {
   }
 }
 
-const CASE = {x: 170, y: 16};
+const CASE_BASE_X = 170;
+const CASE = {x: CASE_BASE_X, y: 16};
 const CAKE_COLORS = ["#f2a0b8", "#a8d8a0", "#f7d64a", "#c3b2e2", "#f2b48a", "#a6dcf5"];
 function drawCase(containers) {
   const {x, y} = CASE;
@@ -335,7 +340,8 @@ function drawCase(containers) {
   rect(x - 4, y + 62, 128, 10, "#8a5f3c");
 }
 
-const WINDOW = {x: 30, y: 16};
+const WINDOW_BASE_X = 30;
+const WINDOW = {x: WINDOW_BASE_X, y: 16};
 function drawWindow(load) {
   const {x, y} = WINDOW;
   const hot = load >= 70, warm = load >= 35;
