@@ -34,6 +34,10 @@ Hover any cat or kitten for its full latest activity.
 - **macOS** (uses `ioreg`, `lsof`, and `ps` — Linux/Windows aren't supported yet).
 - **Python 3** on your `PATH` (macOS ships with it).
 - Claude Code, writing transcripts to `~/.claude/projects/` (its default).
+- Sessions from an interactive terminal and from SDK harnesses (Nimbalyst, the
+  Agent SDK) are both shown. A terminal session holds a seat while its `claude`
+  process lives; a harness session runs one process per turn, so it stays
+  seated for the activity window instead of leaving after every reply.
 - Docker is optional — the pastry case just stays empty without it.
 
 ## Install

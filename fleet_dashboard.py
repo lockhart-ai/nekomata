@@ -91,6 +91,17 @@ def is_claude_process(process: dict) -> bool:
     return os.path.basename(first_token) == "claude"
 
 
+TURN_SCOPED_FLAGS = ("--output-format stream-json", "--input-format stream-json",
+                     " -p ", " --print")
+
+
+def is_turn_scoped_process(args: str) -> bool:
+    """A print-mode launch (what SDK harnesses such as Nimbalyst spawn) serves one
+    turn and exits; it is not a seat a session holds between turns."""
+    padded = f" {args} "
+    return any(flag in padded for flag in TURN_SCOPED_FLAGS)
+
+
 def readable_command(args: str) -> tuple[str, bool]:
     """Extract the human command from a Claude Code shell-snapshot wrapper."""
     match = SNAPSHOT_EVAL_PATTERN.search(args)
@@ -143,6 +154,7 @@ def walk_tree(root_pid: int, table: dict[int, dict], children: dict[int, list[in
     root = table[root_pid]
     return {
         "pid": root_pid,
+        "turn_scoped": is_turn_scoped_process(root["args"]),
         "elapsed": root["elapsed"],
         "cpu": round(total_cpu, 1),
         "rss_mb": total_rss_kb // 1024,
@@ -405,6 +417,20 @@ def pending_background_tasks(tail_entries: list[dict]) -> int:
     return len(launched - completed)
 
 
+def session_entrypoint(head_entries: list[dict]) -> str:
+    """Claude Code stamps every entry with how it was launched: "cli" for an
+    interactive terminal, "sdk-cli" / "sdk-ts" for SDK harnesses."""
+    for entry in head_entries:
+        value = entry.get("entrypoint")
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+def is_harness_session(session: dict) -> bool:
+    return session["entrypoint"].startswith("sdk")
+
+
 def parse_session(path: Path, modified_at: float, project_name: str,
                   parent_id: str) -> dict:
     file_size = path.stat().st_size
@@ -420,6 +446,7 @@ def parse_session(path: Path, modified_at: float, project_name: str,
         "parent_id": parent_id,
         "project": project_name.lstrip("-").replace("-", "/"),
         "title": session_title(head_entries, tail_entries),
+        "entrypoint": session_entrypoint(head_entries),
         "branch": branch,
         "model": model,
         "events": events,
@@ -539,17 +566,27 @@ def run_sampler(sample_function, interval_seconds: float) -> None:
         time.sleep(max(0.2, interval_seconds - (time.time() - started)))
 
 
-def prune_dead_sessions(sessions: list[dict], live_claude_count: int,
+def prune_dead_sessions(sessions: list[dict], trees: list[dict],
                         processes_sampled: bool) -> list[dict]:
-    """Seats are limited to the number of live claude processes.
+    """Interactive seats are limited to the number of live interactive claude
+    processes.
 
     A killed session's transcript stays recently-modified for the whole activity
     window, so mtime alone leaves ghost cats behind (e.g. after a VS Code window
-    reload kills the terminals). Each top-level session is exactly one `claude`
-    process, so the N most-recently-active sessions are the live ones.
+    reload kills the terminals). Each interactive top-level session is exactly
+    one long-lived `claude` process, so the N most-recently-active interactive
+    sessions are the live ones.
+
+    SDK-driven sessions (Nimbalyst and the like) are different: the harness
+    spawns a print-mode process per turn and lets it exit, so between turns
+    there is no process at all. Counting them against seats carried every cat
+    out the moment its reply finished. They are exempt here and governed by the
+    activity window in sample_sessions instead; their per-turn processes are
+    likewise not counted as seats.
     """
     if not processes_sampled:
         return sessions
+    seats = sum(1 for tree in trees if not tree.get("turn_scoped"))
     kitten_latest: dict[str, float] = {}
     for session in sessions:
         if session["parent_id"]:
@@ -559,9 +596,11 @@ def prune_dead_sessions(sessions: list[dict], live_claude_count: int,
     def effective_activity(cat: dict) -> float:
         return max(cat["modified_at"], kitten_latest.get(cat["id"], 0.0))
 
-    cats = sorted((session for session in sessions if not session["parent_id"]),
-                  key=effective_activity, reverse=True)
-    keep = {session["id"] for session in cats[:live_claude_count]}
+    cats = [session for session in sessions if not session["parent_id"]]
+    harness = {cat["id"] for cat in cats if is_harness_session(cat)}
+    interactive = sorted((cat for cat in cats if cat["id"] not in harness),
+                         key=effective_activity, reverse=True)
+    keep = harness | {session["id"] for session in interactive[:seats]}
     return [session for session in sessions
             if session["id"] in keep or session["parent_id"] in keep]
 
@@ -646,7 +685,7 @@ def snapshot() -> dict:
             "trees": STATE.trees,
             "docker": STATE.docker,
             "sessions": prune_dead_sessions(
-                STATE.sessions, len(STATE.trees), bool(STATE.history)),
+                STATE.sessions, STATE.trees, bool(STATE.history)),
             "history": list(STATE.history),
         }
 
