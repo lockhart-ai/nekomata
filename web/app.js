@@ -702,6 +702,155 @@ function drawSpotWithCat(slot, session, now) {
     session.pending_tasks, (taskFlashUntil.get(session.id) || 0) > frame);
 }
 
+// ------------------------------------------------------------ wall decor
+// Fills the wall between the centred cluster and the edge plants on wide
+// scenes: faint paw marks on the plaster, string lights along the top of the
+// gap, then small items placed outward from the cluster, one per
+// DECOR_SPACING px. At the base 720 width there is no gap and nothing draws.
+const DECOR_SPACING = 120;
+const DECOR_MIN_GAP = 48;
+const DECOR_LEFT_SEQUENCE = ["clock", "frame", "sconce", "shelf", "frame", "sconce"];
+const DECOR_RIGHT_SEQUENCE = ["frame", "sconce", "shelf", "paw-frame", "sconce", "shelf"];
+const LIGHT_COLORS = ["#f7d64a", "#f2a0b8", "#a8d8c0", "#6db5e8"];
+const WALL_PAW_INK = "#e4c19a";
+
+const FRAME_CAT = [
+  ".K...K..",
+  ".KK.KK..",
+  ".KKKKK..",
+  ".KKKKK..",
+  "..KKK.K.",
+  "..KKK.K.",
+  ".KKKKK..",
+  "........",
+];
+const PAW = [
+  "..K..K..",
+  ".K.KK.K.",
+  "........",
+  "..KKKK..",
+  ".KKKKKK.",
+  ".KKKKKK.",
+  "..KKKK..",
+  "........",
+];
+
+function drawFrame(cx, cy, art, ink) {
+  rect(cx, cy - 16, 1, 3, "#5a3e2e");                       // nail
+  rect(cx - 14, cy - 12, 28, 24, "#8a5f3c");                // frame
+  rect(cx - 13, cy - 11, 26, 1, "#a87c62");                 // top highlight
+  rect(cx - 12, cy - 10, 24, 20, "#fffaf2");                // mat
+  drawBitmap(art, cx - 8, cy - 8, 2, {K: ink});
+}
+
+function drawSconce(cx, cy) {
+  rect(cx - 9, cy - 8, 18, 14, "#f4d9b4");                  // glow on the wall
+  rect(cx - 1, cy, 2, 10, "#8a5f3c");                       // arm
+  rect(cx - 3, cy + 9, 6, 3, "#8a5f3c");                    // base plate
+  rect(cx - 5, cy - 6, 10, 2, "#e9d8a8");                   // shade
+  rect(cx - 6, cy - 4, 12, 4, "#e9d8a8");
+  rect(cx - 7, cy, 14, 1, "#d9c391");
+  const dim = (frame + cx) % 9 === 0;                       // the occasional flicker
+  rect(cx - 2, cy - 2, 4, 3, dim ? "#f2d284" : "#ffe9a3");  // bulb
+}
+
+function drawMiniShelf(cx, cy) {
+  rect(cx - 14, cy, 28, 3, "#a87c62");                      // plank
+  rect(cx - 14, cy, 28, 1, "#c09678");
+  rect(cx - 11, cy + 3, 2, 5, "#8a5f3c");                   // brackets
+  rect(cx + 9, cy + 3, 2, 5, "#8a5f3c");
+  rect(cx - 8, cy - 7, 8, 7, "#c47a52");                    // pot
+  rect(cx - 9, cy - 8, 10, 2, "#a05f3e");
+  rect(cx - 7, cy - 12, 2, 5, "#2f7d33");                   // succulent
+  rect(cx - 4, cy - 14, 2, 7, "#3c9440");
+  rect(cx - 2, cy - 11, 2, 4, "#2f7d33");
+  rect(cx - 5, cy - 15, 2, 2, "#f2a0b8");
+  rect(cx + 4, cy - 6, 5, 6, "#6db5e8");                    // a jar of treats
+  rect(cx + 4, cy - 7, 5, 1, "#8f8b84");
+  rect(cx + 5, cy - 4, 3, 3, "#d9bf9c");
+}
+
+function drawClock(cx, cy) {
+  const radius = 9;
+  for (let dy = -radius; dy <= radius; dy++) {
+    const half = Math.round(Math.sqrt(radius * radius - dy * dy));
+    rect(cx - half, cy + dy, half * 2, 1, "#8a5f3c");
+  }
+  for (let dy = -7; dy <= 7; dy++) {
+    const half = Math.round(Math.sqrt(49 - dy * dy));
+    rect(cx - half, cy + dy, half * 2, 1, "#fffaf2");
+  }
+  rect(cx, cy - 6, 1, 1, "#43302a"); rect(cx, cy + 5, 1, 1, "#43302a");
+  rect(cx - 6, cy, 1, 1, "#43302a"); rect(cx + 5, cy, 1, 1, "#43302a");
+  const now = new Date();
+  const minuteAngle = (now.getMinutes() / 60) * Math.PI * 2 - Math.PI / 2;
+  const hourAngle = ((now.getHours() % 12) / 12 + now.getMinutes() / 720) * Math.PI * 2
+    - Math.PI / 2;
+  drawHand(cx, cy, hourAngle, 4);
+  drawHand(cx, cy, minuteAngle, 6);
+  rect(cx, cy, 1, 1, "#43302a");
+}
+
+function drawHand(cx, cy, angle, length) {
+  for (let step = 0; step <= length; step++) {
+    rect(cx + Math.round(Math.cos(angle) * step), cy + Math.round(Math.sin(angle) * step),
+      1, 1, "#43302a");
+  }
+}
+
+function drawStringLights(x0, x1, y) {
+  const span = x1 - x0;
+  const sag = Math.min(7, span / 18);
+  for (let x = x0; x < x1; x += 2) {
+    const t = (x - x0) / span;
+    rect(x, Math.round(y + sag * 4 * t * (1 - t)), 2, 1, "#5a3e2e");
+  }
+  let index = 0;
+  for (let x = x0 + 7; x < x1 - 4; x += 14, index++) {
+    const t = (x - x0) / span;
+    const wy = Math.round(y + sag * 4 * t * (1 - t));
+    const color = LIGHT_COLORS[index % LIGHT_COLORS.length];
+    const resting = (frame + index) % 6 === 0;
+    rect(x, wy + 1, 1, 1, "#5a3e2e");
+    rect(x - 1, wy + 2, 3, 3, resting ? shade(color) : color);
+  }
+}
+
+function drawPawMarks(gap) {
+  const width = gap.to - gap.from;
+  drawBitmap(PAW, Math.round(gap.from + width * 0.3) - 4, 50, 1, {K: WALL_PAW_INK});
+  drawBitmap(PAW, Math.round(gap.from + width * 0.72) - 4, 58, 1, {K: WALL_PAW_INK});
+}
+
+function wallGaps() {
+  // Wall space on each side of the cluster, inside the hanging plants.
+  const left = {from: 28, to: WINDOW.x - 8, outward: -1};
+  const right = {from: COFFEE.x + 86, to: sceneW - 29, outward: 1};
+  return [left, right].filter((gap) => gap.to - gap.from >= DECOR_MIN_GAP);
+}
+
+function drawWallDecor() {
+  for (const gap of wallGaps()) {
+    const width = gap.to - gap.from;
+    drawPawMarks(gap);
+    if (width >= 100) drawStringLights(gap.from + 6, gap.to - 6, 18);
+    const count = Math.floor(width / DECOR_SPACING);
+    const sequence = gap.outward < 0 ? DECOR_LEFT_SEQUENCE : DECOR_RIGHT_SEQUENCE;
+    for (let i = 0; i < count; i++) {
+      // outward from the cluster: the first item sits nearest the props
+      const along = width * (i + 0.5) / count;
+      const cx = Math.round(gap.outward < 0 ? gap.to - along : gap.from + along);
+      switch (sequence[i % sequence.length]) {
+        case "clock": drawClock(cx, 42); break;
+        case "frame": drawFrame(cx, 42, FRAME_CAT, "#43302a"); break;
+        case "paw-frame": drawFrame(cx, 42, PAW, "#7a5a48"); break;
+        case "sconce": drawSconce(cx, 38); break;
+        case "shelf": drawMiniShelf(cx, 50); break;
+      }
+    }
+  }
+}
+
 function drawScene() {
   context.clearRect(0, 0, sceneW, sceneH);
   const data = latestData;
@@ -714,6 +863,7 @@ function drawScene() {
   drawCase(data ? data.docker : []);
   drawBoard();
   drawBunting();
+  drawWallDecor();
   drawHangingPlant(4);
   drawHangingPlant(sceneW - 21);
   drawWaterBowl(sceneW - 106, 330);
