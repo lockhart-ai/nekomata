@@ -3,6 +3,10 @@
 const PALETTE = ["#3987e5", "#199e70", "#c98500", "#008300",
                  "#9085e9", "#e66767", "#d55181", "#d95926"];
 const SCENE_W = 720, SCENE_H = 360, WALL_H = 92;
+// The scene is never narrower than SCENE_W, but it widens to match the
+// viewport's aspect ratio so the cafe fills its box instead of letterboxing.
+const SCENE_W_MAX = 2400;
+let sceneW = SCENE_W;
 let sceneH = SCENE_H;
 let spots = [];
 const TOOL_ICONS = {
@@ -155,6 +159,23 @@ const MAN_COLORS = {H: "#eab68f", G: "#3a3230", W: "#fdfdfb",
 // ------------------------------------------------------------ scene state
 const canvas = document.getElementById("scene");
 const context = canvas.getContext("2d");
+
+function fitSceneToViewport() {
+  // Widen the logical scene to the viewport's aspect ratio. Left-side props
+  // keep their coordinates; right-side props are placed from the right edge
+  // at draw time; the board slides half the extra width so it stays centred.
+  const box = canvas.getBoundingClientRect();
+  if (!box.width || !box.height) return false;
+  const wanted = Math.min(SCENE_W_MAX,
+    Math.max(SCENE_W, Math.round(sceneH * box.width / box.height)));
+  if (wanted === sceneW) return false;
+  sceneW = wanted;
+  canvas.width = sceneW;
+  const extra = sceneW - SCENE_W;
+  COFFEE.x = COFFEE_BASE_X + extra;
+  BOARD.x = BOARD_BASE_X + Math.round(extra / 2);
+  return true;
+}
 const overlay = document.getElementById("overlay");
 let latestData = null;
 let frame = 0;
@@ -177,7 +198,7 @@ function computeSpots(count) {
   const stagger = 44;
   for (let i = 0; i < count; i++) {
     // one equal-width band per cat, cat centered in its band
-    const centerX = Math.round(SCENE_W * (i + 0.5) / count);
+    const centerX = Math.round(sceneW * (i + 0.5) / count);
     const treeY = count <= 2 ? lowLine
       : (i % 2 === 0 ? lowLine - stagger : lowLine);
     result.push({kind: "tree", x: centerX - 39, y: treeY, post: 52});
@@ -249,23 +270,23 @@ function shade(hex) {
 
 // ------------------------------------------------------------ room & props
 function drawRoom() {
-  rect(0, 0, SCENE_W, WALL_H, "#f0d0ae");
-  rect(0, 72, SCENE_W, 20, "#ddab80");
-  for (let sx = 0; sx < SCENE_W; sx += 24) rect(sx, 74, 1, 18, "#cb9a70");
-  rect(0, 72, SCENE_W, 2, "#b98a5e");
+  rect(0, 0, sceneW, WALL_H, "#f0d0ae");
+  rect(0, 72, sceneW, 20, "#ddab80");
+  for (let sx = 0; sx < sceneW; sx += 24) rect(sx, 74, 1, 18, "#cb9a70");
+  rect(0, 72, sceneW, 2, "#b98a5e");
   for (let ty = WALL_H; ty < sceneH; ty += 18) {
     const plankRow = (ty - WALL_H) / 18;
-    rect(0, ty, SCENE_W, 18, plankRow % 2 ? "#c09678" : "#c89e80");
-    rect(0, ty, SCENE_W, 1, "#a87c62");
-    for (let sx = (plankRow % 3) * 48; sx < SCENE_W; sx += 144)
+    rect(0, ty, sceneW, 18, plankRow % 2 ? "#c09678" : "#c89e80");
+    rect(0, ty, sceneW, 1, "#a87c62");
+    for (let sx = (plankRow % 3) * 48; sx < sceneW; sx += 144)
       rect(sx, ty + 1, 1, 17, "#a87c62");
   }
 }
 
 function drawBunting() {
-  rect(0, 2, SCENE_W, 2, "#b98a5e");
+  rect(0, 2, sceneW, 2, "#b98a5e");
   const colors = ["#f2a0b8", "#a8d8c0", "#f7d64a", "#c3b2e2"];
-  for (let i = 0; i < SCENE_W / 26; i++) {
+  for (let i = 0; i < sceneW / 26; i++) {
     const color = colors[i % colors.length];
     const bx = i * 26 + 6;
     rect(bx, 4, 12, 4, color); rect(bx + 2, 8, 8, 3, color); rect(bx + 4, 11, 4, 3, color);
@@ -348,7 +369,8 @@ function drawWindow(load) {
   rect(x + 58, y, 4, 60, "#b98a5e"); rect(x, y + 28, 120, 4, "#b98a5e");
 }
 
-const BOARD = {x: 330, y: 10, w: 240, h: 70};
+const BOARD_BASE_X = 330;
+const BOARD = {x: BOARD_BASE_X, y: 10, w: 240, h: 70};
 function drawBoard() {
   rect(BOARD.x - 5, BOARD.y - 5, BOARD.w + 10, BOARD.h + 10, "#8a5f3c");
   rect(BOARD.x, BOARD.y, BOARD.w, BOARD.h, "#4e3a30");
@@ -370,7 +392,7 @@ function drawYarn(x, y, color) {
 const KITTEN_YARN_COLORS = ["#e05a6a", "#9085e9", "#f7d64a", "#6db5e8"];
 
 function advanceKittenPlay(play) {
-  const minX = 24, maxX = SCENE_W - 24, minY = 135, maxY = sceneH - 18;
+  const minX = 24, maxX = sceneW - 24, minY = 135, maxY = sceneH - 18;
   play.ballX += play.ballVX;
   play.ballY += play.ballVY;
   play.ballVX *= 0.72;
@@ -404,7 +426,8 @@ function drawMiniYarn(x, y, color) {
   rect(x + 7, y + 5, 6, 2, shade(color));
 }
 
-const COFFEE = {x: 600, y: 26};
+const COFFEE_BASE_X = 600;
+const COFFEE = {x: COFFEE_BASE_X, y: 26};
 function drawCoffee(pct) {
   const {x, y} = COFFEE;
   const heat = pct == null ? 0 : pct;
@@ -528,7 +551,7 @@ function drawAdoptionRuns() {
   if (!run) return;
   const feetY = sceneH - 16;
   const speed = 20;
-  if (run.x === null) run.x = run.type === "arrive" ? -40 : SCENE_W + 40;
+  if (run.x === null) run.x = run.type === "arrive" ? -40 : sceneW + 40;
   if (run.phase === "in") {
     run.x += run.type === "arrive" ? speed : -speed;
     const reached = run.type === "arrive" ? run.x >= run.targetX
@@ -540,7 +563,7 @@ function drawAdoptionRuns() {
     }
   } else {
     run.x += run.type === "arrive" ? -speed : speed;
-    if (run.x < -60 || run.x > SCENE_W + 60) {
+    if (run.x < -60 || run.x > sceneW + 60) {
       if (run.type === "arrive") hiddenCatIds.delete(run.id);
       adoptionRuns.shift();
       return;
@@ -674,7 +697,7 @@ function drawSpotWithCat(slot, session, now) {
 }
 
 function drawScene() {
-  context.clearRect(0, 0, SCENE_W, sceneH);
+  context.clearRect(0, 0, sceneW, sceneH);
   const data = latestData;
   const latest = data && data.history.length
     ? data.history[data.history.length - 1] : null;
@@ -686,11 +709,11 @@ function drawScene() {
   drawBoard();
   drawBunting();
   drawHangingPlant(4);
-  drawHangingPlant(699);
-  drawWaterBowl(614, 330);
+  drawHangingPlant(sceneW - 21);
+  drawWaterBowl(sceneW - 106, 330);
   drawCoffee(data ? data.gpu : null);
   drawYarn(206, 332, "#e66767");
-  drawYarn(560, 324, "#9085e9");
+  drawYarn(sceneW - 160, 324, "#9085e9");
   drawPlant(16, 106);
   const now = data ? data.generated_at : 0;
   const bySlot = new Map();
@@ -740,13 +763,13 @@ function drawScene() {
 // ------------------------------------------------------------ overlays (DOM text)
 function sceneScale() {
   const box = canvas.getBoundingClientRect();
-  return Math.min(box.width / SCENE_W, box.height / sceneH);
+  return Math.min(box.width / sceneW, box.height / sceneH);
 }
 
 function scenePosition(x, y) {
   const box = canvas.getBoundingClientRect();
   const scale = sceneScale();
-  const offsetX = (box.width - SCENE_W * scale) / 2;
+  const offsetX = (box.width - sceneW * scale) / 2;
   const offsetY = (box.height - sceneH * scale) / 2;
   return {left: offsetX + x * scale, top: offsetY + y * scale};
 }
@@ -841,7 +864,7 @@ function renderOverlay(data) {
   const scale = sceneScale();
   const bubbleFont = Math.max(9, Math.min(12, 11 * scale));
   // a bubble may fill at most its cat's equal share of the floor width
-  const bandScreen = Math.round((SCENE_W / Math.max(1, spots.length)) * scale) - 12;
+  const bandScreen = Math.round((sceneW / Math.max(1, spots.length)) * scale) - 12;
   const bubbleSize = `font-size:${bubbleFont.toFixed(1)}px;` +
     `max-width:${Math.max(90, Math.min(300, bandScreen))}px;`;
   const miniBubbleSize = `font-size:${bubbleFont.toFixed(1)}px;` +
@@ -994,6 +1017,7 @@ function trackAdoptions(cats) {
 }
 
 function apply(data) {
+  fitSceneToViewport();
   const cats = data.sessions.filter((s) => !s.parent_id);
   // Freeze the layout while a departure is pending (or detected this cycle):
   // the man collects the cat from the arrangement as-it-was; the remaining
@@ -1110,7 +1134,12 @@ document.addEventListener("visibilitychange", () => {
 clientLog(`page boot · ${navigator.userAgent.split(") ")[0]})`);
 
 const BOOTSTRAP = "__BOOTSTRAP__";
-window.addEventListener("resize", () => { if (latestData) renderOverlay(latestData); });
+window.addEventListener("resize", () => {
+  const widthChanged = fitSceneToViewport();
+  if (!latestData) return;
+  if (widthChanged) apply(latestData); else renderOverlay(latestData);
+});
+fitSceneToViewport();
 if (typeof BOOTSTRAP === "object" && BOOTSTRAP) apply(BOOTSTRAP);
 drawScene();
 refresh();
