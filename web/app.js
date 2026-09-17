@@ -704,15 +704,26 @@ function drawSpotWithCat(slot, session, now) {
 
 // ------------------------------------------------------------ wall decor
 // Fills the wall between the centred cluster and the edge plants on wide
-// scenes: a faint trail of paw prints padding across the plaster, with a
-// sconce or a mini shelf every DECOR_SPACING px. At the base 720 width there
-// is no gap and nothing draws.
+// scenes: faint paw marks on the plaster, string lights along the top of the
+// gap, then small items placed outward from the cluster, one per
+// DECOR_SPACING px. At the base 720 width there is no gap and nothing draws.
 const DECOR_SPACING = 120;
 const DECOR_MIN_GAP = 48;
-const DECOR_SEQUENCE = ["sconce", "shelf"];
-const PAW_STEP = 24;
-const WALL_PAW_INK = "#e2bd95";
+const DECOR_LEFT_SEQUENCE = ["clock", "frame", "sconce", "shelf", "frame", "sconce"];
+const DECOR_RIGHT_SEQUENCE = ["frame", "sconce", "shelf", "paw-frame", "sconce", "shelf"];
+const LIGHT_COLORS = ["#f7d64a", "#f2a0b8", "#a8d8c0", "#6db5e8"];
+const WALL_PAW_INK = "#e4c19a";
 
+const FRAME_CAT = [
+  ".K...K..",
+  ".KK.KK..",
+  ".KKKKK..",
+  ".KKKKK..",
+  "..KKK.K.",
+  "..KKK.K.",
+  ".KKKKK..",
+  "........",
+];
 const PAW = [
   "..K..K..",
   ".K.KK.K.",
@@ -723,7 +734,14 @@ const PAW = [
   "..KKKK..",
   "........",
 ];
-const PAW_MIRROR = PAW.map((row) => row.split("").reverse().join(""));
+
+function drawFrame(cx, cy, art, ink) {
+  rect(cx, cy - 16, 1, 3, "#5a3e2e");                       // nail
+  rect(cx - 14, cy - 12, 28, 24, "#8a5f3c");                // frame
+  rect(cx - 13, cy - 11, 26, 1, "#a87c62");                 // top highlight
+  rect(cx - 12, cy - 10, 24, 20, "#fffaf2");                // mat
+  drawBitmap(art, cx - 8, cy - 8, 2, {K: ink});
+}
 
 function drawSconce(cx, cy) {
   rect(cx - 9, cy - 8, 18, 14, "#f4d9b4");                  // glow on the wall
@@ -752,16 +770,56 @@ function drawMiniShelf(cx, cy) {
   rect(cx + 5, cy - 4, 3, 3, "#d9bf9c");
 }
 
-function drawPawTrail(gap) {
-  // Left and right feet alternate above and below a gently waving line, as
-  // if a cat walked along the wall. Positions depend only on x, so the trail
-  // is steady across refreshes.
-  let step = 0;
-  for (let x = gap.from + 8; x < gap.to - 8; x += PAW_STEP, step++) {
-    const wave = Math.round(Math.sin(x / 37) * 5);
-    const y = 40 + wave + (step % 2 ? 7 : -7);
-    drawBitmap(step % 2 ? PAW_MIRROR : PAW, x - 4, y - 4, 1, {K: WALL_PAW_INK});
+function drawClock(cx, cy) {
+  const radius = 9;
+  for (let dy = -radius; dy <= radius; dy++) {
+    const half = Math.round(Math.sqrt(radius * radius - dy * dy));
+    rect(cx - half, cy + dy, half * 2, 1, "#8a5f3c");
   }
+  for (let dy = -7; dy <= 7; dy++) {
+    const half = Math.round(Math.sqrt(49 - dy * dy));
+    rect(cx - half, cy + dy, half * 2, 1, "#fffaf2");
+  }
+  rect(cx, cy - 6, 1, 1, "#43302a"); rect(cx, cy + 5, 1, 1, "#43302a");
+  rect(cx - 6, cy, 1, 1, "#43302a"); rect(cx + 5, cy, 1, 1, "#43302a");
+  const now = new Date();
+  const minuteAngle = (now.getMinutes() / 60) * Math.PI * 2 - Math.PI / 2;
+  const hourAngle = ((now.getHours() % 12) / 12 + now.getMinutes() / 720) * Math.PI * 2
+    - Math.PI / 2;
+  drawHand(cx, cy, hourAngle, 4);
+  drawHand(cx, cy, minuteAngle, 6);
+  rect(cx, cy, 1, 1, "#43302a");
+}
+
+function drawHand(cx, cy, angle, length) {
+  for (let step = 0; step <= length; step++) {
+    rect(cx + Math.round(Math.cos(angle) * step), cy + Math.round(Math.sin(angle) * step),
+      1, 1, "#43302a");
+  }
+}
+
+function drawStringLights(x0, x1, y) {
+  const span = x1 - x0;
+  const sag = Math.min(7, span / 18);
+  for (let x = x0; x < x1; x += 2) {
+    const t = (x - x0) / span;
+    rect(x, Math.round(y + sag * 4 * t * (1 - t)), 2, 1, "#5a3e2e");
+  }
+  let index = 0;
+  for (let x = x0 + 7; x < x1 - 4; x += 14, index++) {
+    const t = (x - x0) / span;
+    const wy = Math.round(y + sag * 4 * t * (1 - t));
+    const color = LIGHT_COLORS[index % LIGHT_COLORS.length];
+    const resting = (frame + index) % 6 === 0;
+    rect(x, wy + 1, 1, 1, "#5a3e2e");
+    rect(x - 1, wy + 2, 3, 3, resting ? shade(color) : color);
+  }
+}
+
+function drawPawMarks(gap) {
+  const width = gap.to - gap.from;
+  drawBitmap(PAW, Math.round(gap.from + width * 0.3) - 4, 50, 1, {K: WALL_PAW_INK});
+  drawBitmap(PAW, Math.round(gap.from + width * 0.72) - 4, 58, 1, {K: WALL_PAW_INK});
 }
 
 function wallGaps() {
@@ -774,13 +832,18 @@ function wallGaps() {
 function drawWallDecor() {
   for (const gap of wallGaps()) {
     const width = gap.to - gap.from;
-    drawPawTrail(gap);
+    drawPawMarks(gap);
+    if (width >= 100) drawStringLights(gap.from + 6, gap.to - 6, 18);
     const count = Math.floor(width / DECOR_SPACING);
+    const sequence = gap.outward < 0 ? DECOR_LEFT_SEQUENCE : DECOR_RIGHT_SEQUENCE;
     for (let i = 0; i < count; i++) {
       // outward from the cluster: the first item sits nearest the props
       const along = width * (i + 0.5) / count;
       const cx = Math.round(gap.outward < 0 ? gap.to - along : gap.from + along);
-      switch (DECOR_SEQUENCE[i % DECOR_SEQUENCE.length]) {
+      switch (sequence[i % sequence.length]) {
+        case "clock": drawClock(cx, 42); break;
+        case "frame": drawFrame(cx, 42, FRAME_CAT, "#43302a"); break;
+        case "paw-frame": drawFrame(cx, 42, PAW, "#7a5a48"); break;
         case "sconce": drawSconce(cx, 38); break;
         case "shelf": drawMiniShelf(cx, 50); break;
       }
