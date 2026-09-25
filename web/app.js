@@ -181,6 +181,9 @@ function fitSceneToViewport() {
   return true;
 }
 const overlay = document.getElementById("overlay");
+// Inside Glade, web/glade.js is inlined ahead of this script and the scene is
+// fed by Glade's plugin events instead of the server: no /data, no client log.
+const gladeFeed = typeof NekomataGlade === "object" ? NekomataGlade : null;
 let latestData = null;
 let frame = 0;
 const spotBySession = new Map();
@@ -954,8 +957,8 @@ function renderOverlay(data) {
     commands.slice(0, 4).map((c) => `<div>▸ ${escapeHtml(c)}</div>`).join("") +
     `</div>`);
   if (!data.sessions.length)
-    pieces.push(`<div class="empty-office">The cafe is empty — no cats working` +
-      ` in the last 15 minutes.</div>`);
+    pieces.push(`<div class="empty-office">The cafe is empty — no ` +
+      (gladeFeed ? "active tasks." : "cats working in the last 15 minutes.") + `</div>`);
   overlay.innerHTML = pieces.join("");
   clampBubblesToView();
   resolveBubbleCollisions();
@@ -975,6 +978,12 @@ function clampBubblesToView() {
 
 // ------------------------------------------------------------ main loops
 function renderCorner(data) {
+  if (gladeFeed) {
+    // Glade's panel header carries the count; the corner only speaks up while
+    // the feed isn't live.
+    document.getElementById("corner").hidden = true;
+    return;
+  }
   const latest = data.history[data.history.length - 1] || {claude: 0, docker: 0};
   const cats = data.sessions.filter((s) => !s.parent_id).length;
   const kittens = data.sessions.length - cats;
@@ -1060,6 +1069,7 @@ let lastClientLogAt = 0;
 let pushCount = 0;
 
 function clientLog(message) {
+  if (gladeFeed) return;
   try { navigator.sendBeacon("/client-log", message); } catch (error) {}
 }
 
@@ -1112,6 +1122,7 @@ window.addEventListener("message", (event) => {
 });
 
 async function refresh() {
+  if (gladeFeed) return;
   if (refreshInFlight && Date.now() - refreshStartedAt < 5000) return;
   if (refreshInFlight) clientLog("stale in-flight fetch lock overridden");
   refreshInFlight = true;
@@ -1150,6 +1161,20 @@ if (typeof BOOTSTRAP === "object" && BOOTSTRAP) apply(BOOTSTRAP);
 drawScene();
 refresh();
 
+// Glade pushes events as things change; each one re-renders straight away,
+// like the VS Code push path, and the pump below re-renders once a second so
+// ages and bubbles move on between events.
+const gladeLink = gladeFeed ? gladeFeed.connect(window, (data) => {
+  consume(data, "glade");
+  frame++;
+  drawScene();
+}) : null;
+if (gladeFeed && !gladeLink) {
+  // opened outside Glade: there's nothing to listen to
+  document.getElementById("corner").classList.add("stale");
+  document.getElementById("corner-text").textContent = "disconnected";
+}
+
 // Drive animation and polling from requestAnimationFrame, not setInterval:
 // Chromium throttles interval timers in webview iframes (sometimes to minutes),
 // but rAF always runs while the page is actually visible.
@@ -1157,7 +1182,10 @@ let lastFrameAt = 0;
 let lastRefreshAt = 0;
 function pump(now) {
   if (now - lastFrameAt >= 320) { lastFrameAt = now; frame++; drawScene(); }
-  if (now - lastRefreshAt >= 1000) { lastRefreshAt = now; refresh(); }
+  if (now - lastRefreshAt >= 1000) {
+    lastRefreshAt = now;
+    if (gladeLink) gladeLink.tick(); else refresh();
+  }
   requestAnimationFrame(pump);
 }
 requestAnimationFrame(pump);
@@ -1165,7 +1193,7 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refresh();
 });
 // Low-frequency backstop in case rAF is ever suspended while still visible.
-setInterval(refresh, 10000);
+setInterval(() => { if (gladeLink) gladeLink.tick(); else refresh(); }, 10000);
 
 // Hover a cat or kitten to see its full last message.
 const hovercard = document.getElementById("hovercard");

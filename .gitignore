@@ -4,3 +4,6 @@ extension/web/
 extension/LICENSE
 # build output
 *.vsix
+
+# the Glade plugin build (./build.sh glade)
+dist/

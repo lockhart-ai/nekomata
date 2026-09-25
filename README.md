@@ -64,10 +64,38 @@ any editor (JetBrains, etc.) or in a browser you can:
 python3 fleet_dashboard.py   # then open http://localhost:8787
 ```
 
+## Glade
+
+Nekomata also runs as a plugin in [Glade](https://github.com/lockhart-ai/glade), beside its
+terminal. There the cats are Glade's tasks rather than Claude Code sessions, and Glade feeds
+them to the page directly, so no server or Python is involved:
+
+- **Cats** are the active tasks in every workspace, **kittens** their subagents. A finished
+  kitten chases yarn for a few minutes, then leaves.
+- A cat **types** while its task works, **raises a paw** while it asks you a question or
+  waits on a permission card, sips **coffee** while it's paused or its background subagents
+  run on, and **sleeps** while it waits on you. Tool calls and notes are the speech bubbles.
+- Marking a task done (or deleting it) sends the adoption man to carry its cat out.
+- Glade tells plugins nothing about your machine, so the window, the pastry case and the
+  espresso machine stay quiet.
+
+To install it:
+
+```bash
+./build.sh glade   # builds the plugin folder in dist/glade/nekomata
+cp -R dist/glade/nekomata ~/Library/Application\ Support/glade/plugins/
+```
+
+Then open Glade (or **Settings › Plugins**, which rereads the folder) and make sure Nekomata
+is turned on there. It shows beside the terminal, with its cat count in the panel header.
+Glade runs it sandboxed: one inlined page, with no network and no Node.
+
 ## Build it yourself
 
 ```bash
-./build.sh   # copies the server into the extension and packages nekomata.vsix
+./build.sh         # copies the server into the extension and packages nekomata.vsix
+./build.sh glade   # builds the Glade plugin folder in dist/glade/nekomata
+node --test        # runs the tests (Node 20+, no install)
 ```
 
 No dependencies to install — the build fetches `@vscode/vsce` on demand. Pushing to

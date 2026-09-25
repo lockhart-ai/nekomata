@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 # needed so the tagged-release step can create a release + upload the .vsix
@@ -26,10 +27,23 @@ jobs:
         run: |
           python3 -c "import ast; ast.parse(open('fleet_dashboard.py').read())"
           node --check web/app.js
+          node --check web/glade.js
           node --check extension/extension.js
+
+      - name: Test the Glade adapter and plugin build
+        run: node --test
 
       - name: Build the .vsix
         run: bash build.sh
+
+      - name: Build the Glade plugin
+        run: bash build.sh glade
+
+      - name: Upload the Glade plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nekomata-glade-plugin
+          path: dist/glade/
 
       - name: Upload the .vsix artifact
         uses: actions/upload-artifact@v4
