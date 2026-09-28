@@ -6,7 +6,7 @@
 // app.js's apply() takes: a task is a cat, a subagent is a kitten, a question or
 // permission card raises the cat's paw, tool calls and notes are the speech
 // bubbles, and a task that's done or deleted leaves (the adoption man carries it
-// out). Glade tells a plugin nothing about the machine, so the room's CPU, GPU
+// out), as does one left idle a while, until it's busy again. Glade tells a plugin nothing about the machine, so the room's CPU, GPU
 // and Docker readings stay empty.
 //
 // The Glade build (`./build.sh glade`) inlines this file ahead of app.js; the
@@ -19,6 +19,9 @@
   // A finished subagent stays on the floor chasing yarn this long, as a kitten
   // does between turns in the terminal build, then leaves.
   const KITTEN_LINGER_MS = 5 * 60 * 1000;
+  // A cat with nothing going on leaves after this long, as in the terminal
+  // build (fleet_dashboard.py's SESSION_ACTIVE_WINDOW_SECONDS).
+  const CAT_IDLE_WINDOW_MS = 15 * 60 * 1000;
   // Glade's own name for a task the agent hasn't named yet.
   const UNTITLED_TASK = "New task";
   // An age app.js's sessionStatus reads as awake but not typing (45s–5m): the
@@ -219,16 +222,41 @@
         .sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
     }
 
+    // When a task last did anything: its own calls and notes, its subagents
+    // starting and ending, or Glade updating it.
+    function lastActivityMs(task) {
+      let latest = task.updatedAt || 0;
+      for (const entry of activity.get(task.id) || []) latest = Math.max(latest, entry.at);
+      for (const subagent of subagents.values())
+        if (subagent.taskId === task.id)
+          latest = Math.max(latest, subagent.startedAt || 0, subagent.endedAt || 0);
+      return latest;
+    }
+
+    // Idle: not working, not paused, not asking you anything and no kitten
+    // still out. A task waiting on your reply counts too. It stays in the
+    // model, so its next event brings the cat back in.
+    function goneIdle(task, runningKittens, nowMs) {
+      if (task.activity === "working" || task.activity === "paused") return false;
+      if (task.waitingOn || openAsk(task.id) || runningKittens > 0) return false;
+      return nowMs - lastActivityMs(task) > CAT_IDLE_WINDOW_MS;
+    }
+
     // The data app.js's apply() takes, as of `nowMs`.
     function scene(nowMs) {
       const nowSeconds = nowMs / 1000;
-      const kittens = kittensShown(nowMs);
       const sessions = [];
+      const here = new Set();
+      const kittens = kittensShown(nowMs);
       for (const task of tasks.values()) {
         const running = kittens.filter((k) => k.taskId === task.id && k.state === "running").length;
+        if (goneIdle(task, running, nowMs)) continue;
+        here.add(task.id);
         sessions.push(catSession(task, running, nowMs));
       }
-      for (const kitten of kittens) sessions.push(kittenSession(kitten, nowMs));
+      // a cat that left takes its lingering kittens with it
+      for (const kitten of kittens)
+        if (here.has(kitten.taskId)) sessions.push(kittenSession(kitten, nowMs));
       // the chalkboard's "specials": the commands running right now
       const commands = [];
       for (const entries of activity.values())
@@ -300,7 +328,7 @@
     };
   }
 
-  const api = {API_VERSION, KITTEN_LINGER_MS, createModel, statusText, connect};
+  const api = {API_VERSION, KITTEN_LINGER_MS, CAT_IDLE_WINDOW_MS, createModel, statusText, connect};
   root.NekomataGlade = api;
   if (typeof module === "object" && module.exports) module.exports = api;
 })(typeof globalThis === "object" ? globalThis : this);

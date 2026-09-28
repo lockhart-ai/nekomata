@@ -9,7 +9,7 @@ import { describe, test } from "node:test";
 import { build, manifest, page } from "../glade/build.mjs";
 
 const require = createRequire(import.meta.url);
-const { createModel, statusText, connect, KITTEN_LINGER_MS } = require("../web/glade.js");
+const { createModel, statusText, connect, KITTEN_LINGER_MS, CAT_IDLE_WINDOW_MS } = require("../web/glade.js");
 
 // ------------------------------------------------------------------ fixtures
 const NOW = Date.parse("2026-09-25T10:00:00Z");
@@ -333,6 +333,83 @@ describe("questions and permission cards: the raised paw", () => {
   });
 });
 
+describe("idle cats: gone after 15 minutes, back when busy", () => {
+  const idleSince = NOW - CAT_IDLE_WINDOW_MS - 1;
+  const stale = (id, fields = {}) => task(id, { createdAt: idleSince, updatedAt: idleSince, ...fields });
+
+  test("an idle task leaves once the window passes, asleep until then", () => {
+    const model = fed(snapshot({ tasks: [stale("t1"), task("t2", { updatedAt: NOW - CAT_IDLE_WINDOW_MS + 1 })] }));
+    assert.deepEqual(cats(model).map((s) => s.id), ["t2"]);
+    assert.equal(pose(cat(model, "t2")), "asleep");
+  });
+
+  test("a task waiting on your reply or whose turn failed leaves too", () => {
+    const model = fed(snapshot({ tasks: [stale("t1", { needsYou: true }), stale("t2", { activity: "error" })] }));
+    assert.deepEqual(cats(model), []);
+  });
+
+  test("its latest call or note, not just Glade's update, is its last activity", () => {
+    const model = fed(snapshot({ tasks: [stale("t1"), stale("t2")] }),
+      { type: "agent.toolCall", call: call("c1", "t1", { state: "done", startedAt: NOW - 60_000, endedAt: NOW - 59_000 }) },
+      { type: "agent.note", taskId: "t2", subagentId: null, text: "Over to you.", at: NOW - 60_000 });
+    assert.deepEqual(cats(model).map((s) => s.id).sort(), ["t1", "t2"]);
+    const later = NOW - 60_000 + CAT_IDLE_WINDOW_MS + 1;
+    assert.deepEqual(cats(model, later), []);
+  });
+
+  test("working, paused, asking a question or waiting on a permission card: it stays however long", () => {
+    const model = fed(snapshot({
+      tasks: [stale("t1", { activity: "working" }), stale("t2", { activity: "paused" }),
+        stale("t3", { waitingOn: "question" }), stale("t4"), stale("t5"), stale("t6")],
+      questions: [question("t4", "q1")], permissions: [permission("t5", "p1")],
+    }));
+    const later = NOW + 24 * 3_600_000;
+    assert.deepEqual(cats(model, later).map((s) => s.id).sort(), ["t1", "t2", "t3", "t4", "t5"]);
+  });
+
+  test("a task with a kitten still out stays; one that's finished keeps it in for the window", () => {
+    const model = fed(snapshot({ tasks: [stale("t1"), stale("t2")],
+      subagents: [subagent("s1", "t1", { startedAt: idleSince }),
+        subagent("s2", "t2", { state: "done", startedAt: idleSince, endedAt: NOW - 60_000 })] }));
+    assert.deepEqual(cats(model).map((s) => s.id).sort(), ["t1", "t2"]);
+    assert.deepEqual(kittens(model).map((s) => s.id).sort(), ["s1", "s2"]);
+    const later = NOW - 60_000 + CAT_IDLE_WINDOW_MS + 1;
+    assert.deepEqual(cats(model, later).map((s) => s.id), ["t1"]);
+    assert.deepEqual(kittens(model, later).map((s) => [s.id, s.parent_id]), [["s1", "t1"]]);
+  });
+
+  test("a cat that left takes its lingering kittens with it: no orphans", () => {
+    const model = fed(snapshot({ tasks: [task("t1")],
+      subagents: [subagent("s1", "t1", { state: "done", endedAt: NOW })] }));
+    const later = NOW + CAT_IDLE_WINDOW_MS + 1;
+    assert.equal(cat(model, "t1", later), undefined);
+    assert.deepEqual(kittens(model, later), []);
+    for (const s of sessionsOf(model, later)) assert.ok(!s.parent_id);
+  });
+
+  test("new activity brings it back in", () => {
+    const back = (event) => {
+      const model = fed(snapshot({ tasks: [stale("t1")] }));
+      assert.equal(cat(model, "t1"), undefined);
+      model.handle(event);
+      return cat(model, "t1");
+    };
+    assert.equal(pose(back({ type: "agent.toolCall", call: call("c1", "t1") })), "asleep");
+    assert.equal(pose(back({ type: "task.updated", task: stale("t1", { activity: "working" }) })), "typing");
+    assert.equal(pose(back({ type: "task.updated", task: task("t1") })), "asleep");
+    assert.equal(pose(back({ type: "question.opened", question: question("t1", "q1") })), "paw");
+    assert.equal(pose(back({ type: "permission.opened", request: permission("t1", "p1") })), "paw");
+    assert.ok(back({ type: "subagent.started", subagent: subagent("s1", "t1") }));
+  });
+
+  test("the header's count leaves the idle cats out", () => {
+    const model = fed(snapshot({ tasks: [stale("t1"), task("t2"), task("t3", { activity: "working" })],
+      subagents: [subagent("s1", "t3")] }));
+    assert.equal(statusText(model.scene(NOW)), "2 cats · 1 kitten");
+    assert.equal(statusText(model.scene(NOW + CAT_IDLE_WINDOW_MS)), "1 cat · 1 kitten");
+  });
+});
+
 describe("the feed", () => {
   test("hello and event types it doesn't know change nothing", () => {
     const model = fed(snapshot({ tasks: [task("t1")] }));
@@ -501,6 +578,21 @@ describe("connect", () => {
     assert.equal(scenes.at(-1).generated_at, now / 1000);
     assert.deepEqual(win.posted.at(-1), { type: "status", text: "1 cat" });
     assert.equal(link.isLive(), true);
+  });
+
+  test("an idle cat leaves on a tick, with no event, and comes back on the next one", () => {
+    const win = fakeWindow();
+    const scenes = [];
+    let now = NOW;
+    const link = connect(win, (data) => scenes.push(data), () => now);
+    win.send(snapshot({ tasks: [task("t1"), task("t2", { activity: "working" })] }));
+    assert.deepEqual(win.posted.at(-1), { type: "status", text: "2 cats" });
+    now = NOW - 60_000 + CAT_IDLE_WINDOW_MS + 1;
+    link.tick();
+    assert.deepEqual(scenes.at(-1).sessions.map((s) => s.id), ["t2"]);
+    assert.deepEqual(win.posted.at(-1), { type: "status", text: "1 cat" });
+    win.send({ type: "agent.note", taskId: "t1", subagentId: null, text: "Back.", at: now });
+    assert.deepEqual(win.posted.at(-1), { type: "status", text: "2 cats" });
   });
 
   test("an event that changes nothing doesn't re-render", () => {
