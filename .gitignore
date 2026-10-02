@@ -10,3 +10,7 @@ dist/
 
 # frames written by tools/scene-shot.mjs
 /scene-shots/
+# Glade tasks' own folders (see CLAUDE.md), and keys that must never be committed
+/tasks/
+*.pem
+*.key
