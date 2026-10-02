@@ -41,6 +41,12 @@ describe("the scene", () => {
     assertMatchesGolden("cafe-run-16bit", hashes);
   });
 
+  test("the 32bit style draws the cafe run as recorded", async () => {
+    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=32bit" });
+    assert.deepEqual(problems, []);
+    assertMatchesGolden("cafe-run-32bit", hashes);
+  });
+
   test("the run covers the adoption man, a startle and the wide layout", async () => {
     const scene = loadScene({ scripts: sceneScripts(), snapshot: cafeRun });
     const seen = { man: false, startled: false, wide: false, sixTrees: false };

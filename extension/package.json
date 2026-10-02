@@ -58,10 +58,11 @@
       "properties": {
         "nekomata.style": {
           "type": "string",
-          "enum": ["8bit", "16bit"],
+          "enum": ["8bit", "16bit", "32bit"],
           "enumDescriptions": [
             "The original: flat, chunky cats on big pixels.",
-            "Midway: the same chunky cats on a finer grid, with shading and smiles."
+            "Midway: the same chunky cats on a finer grid, with shading and smiles.",
+            "Finer and cosier: outlined, shaded cats in a calm panelled room."
           ],
           "default": "8bit",
           "description": "The cafe's art style."
