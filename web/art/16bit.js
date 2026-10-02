@@ -611,18 +611,18 @@ function drawRoom(g, w) {
   g.rect(0, top + 2, w, WALL_H - top - 2, "#dbad82");
   for (let x = 4; x < w; x += 10) { g.rect(x, top + 2, 1, 6, "#c4946a"); g.rect(x + 1, top + 2, 1, 6, "#e4ba92"); }
   g.rect(0, WALL_H - 2, w, 2, "#b58458"); g.rect(0, WALL_H - 1, w, 1, "#94694a");
-  // floor: staggered planks in two tones, plus the odd lighter board
-  const PH = 8, PL = 58;
+  // floor: staggered planks in close tones with faint seams, so it sits quietly under the cats
+  const PH = 8, PL = 58, SEAM = "#bb9175";
   for (let y = WALL_H, row = 0; y < H; y += PH, row++) {
     const offset = (row * 23) % PL;
     for (let x = -offset, n = 0; x < w; x += PL, n++) {
       const r = hash(row, n);
-      const tone = r > 0.78 ? "#cfa787" : (row + n) % 2 ? "#c2987a" : "#c9a081";
+      const tone = r > 0.78 ? "#cca485" : (row + n) % 2 ? "#c69d7f" : "#c9a081";
       g.rect(x, y, PL, PH, tone);
-      g.rect(x, y, 1, PH, "#aa7f64");
-      if (r < 0.4) g.rect(x + 8 + Math.floor(r * 90), y + 4, 6, 1, mix(tone, "#8a5a3c", 0.16));   // one grain dash
+      g.rect(x, y, 1, PH, SEAM);
+      if (r < 0.25) g.rect(x + 8 + Math.floor(r * 140), y + 4, 6, 1, mix(tone, "#8a5a3c", 0.08));  // one grain dash
     }
-    g.rect(0, y, w, 1, "#aa7f64");
+    g.rect(0, y, w, 1, SEAM);
   }
   g.rect(0, WALL_H, w, 1, "#8f6850");                                           // the wall's shadow line
 }
