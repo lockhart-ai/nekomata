@@ -35,6 +35,12 @@ describe("the scene", () => {
     assertMatchesGolden("cafe-run-8bit", hashes);
   });
 
+  test("the 16bit style draws the cafe run as recorded", async () => {
+    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=16bit" });
+    assert.deepEqual(problems, []);
+    assertMatchesGolden("cafe-run-16bit", hashes);
+  });
+
   test("the run covers the adoption man, a startle and the wide layout", async () => {
     const scene = loadScene({ scripts: sceneScripts(), snapshot: cafeRun });
     const seen = { man: false, startled: false, wide: false, sixTrees: false };
@@ -59,6 +65,38 @@ describe("the scene", () => {
     });
     await scene.frame();
     assert.match(scene.elements.overlay.innerHTML, /The cafe is empty/);
+    assert.deepEqual(scene.problems, []);
+  });
+});
+
+describe("choosing a style", () => {
+  test("?style= picks it, and one this build doesn't have keeps the default", () => {
+    const pick = (search) => loadScene({ scripts: sceneScripts(), snapshot: cafeRun, search });
+    assert.equal(pick("").evaluate("ART.id"), "8bit");
+    assert.equal(pick("?style=16bit").evaluate("ART.id"), "16bit");
+    assert.equal(pick("?style=64bit").evaluate("ART.id"), "8bit");
+    assert.equal(pick("?revive=1&style=16bit").evaluate("ART.id"), "16bit");
+  });
+
+  test("a style handed over with the data swaps the scene while it runs", async () => {
+    let style;
+    const scene = loadScene({
+      scripts: sceneScripts(),
+      snapshot: (t, now) => ({ ...cafeRun(t, now), ...(style ? { style } : {}) }),
+    });
+    for (let frame = 0; frame < 80; frame++) await scene.frame();   // the visitor is being carried in
+    assert.deepEqual([scene.evaluate("ART.id"), scene.canvas.width, scene.canvas.height], ["8bit", 720, 360]);
+    style = "16bit";
+    for (let frame = 0; frame < 10; frame++) await scene.frame();
+    assert.deepEqual([scene.evaluate("ART.id"), scene.canvas.width, scene.canvas.height], ["16bit", 288, 144]);
+    assert.equal(scene.elements.overlay.innerHTML.includes("nametag"), true);
+    assert.equal(scene.evaluate("document.documentElement.dataset.style"), "16bit");
+    // the floor started over: nobody mid-ceremony, every cat seated
+    assert.equal(scene.evaluate("adoptionRuns.length"), 0);
+    assert.equal(scene.evaluate("spots.length"), scene.evaluate("spotBySession.size"));
+    style = "8bit";
+    for (let frame = 0; frame < 10; frame++) await scene.frame();
+    assert.deepEqual([scene.evaluate("ART.id"), scene.canvas.width], ["8bit", 720]);
     assert.deepEqual(scene.problems, []);
   });
 });

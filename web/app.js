@@ -5,14 +5,17 @@ const PALETTE = ["#3987e5", "#199e70", "#c98500", "#008300",
 // What the scene looks like is a style's business (web/art/): it draws the room, the cats
 // and everything else, and says where things sit. This file decides what happens. Scene
 // coordinates are the style's art pixels: ART.px scene pixels each on the 720x360 scene.
-const ART = NekomataArt["8bit"];
-const UNIT = ART.px;
-const SCENE_W = ART.width;
+// The style is picked by the page's ?style= (the VS Code setting, or typed by hand) or, in
+// Glade, by the plugin's setting; useStyle() below swaps it while the scene runs.
+const DEFAULT_STYLE = "8bit";
+let ART = NekomataArt[DEFAULT_STYLE];
+let UNIT = ART.px;
+let SCENE_W = ART.width;
 // The scene is never narrower than SCENE_W, but it widens to match the
 // viewport's aspect ratio so the cafe fills its box instead of letterboxing.
-const SCENE_W_MAX = Math.round(2400 / UNIT);
+let SCENE_W_MAX = Math.round(2400 / UNIT);
 let sceneW = SCENE_W;
-const sceneH = ART.height;
+let sceneH = ART.height;
 let spots = [];
 const TOOL_ICONS = {
   Read: "\u{1F4D6}", Edit: "✏️", Write: "\u{1F4DD}", Bash: "\u{1F4BB}",
@@ -27,7 +30,6 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g,
 // ------------------------------------------------------------ scene state
 const canvas = document.getElementById("scene");
 const context = canvas.getContext("2d");
-canvas.height = sceneH;
 // what a style draws onto
 const pen = {
   rect(x, y, w, h, color) { context.fillStyle = color; context.fillRect(x, y, w, h); },
@@ -60,6 +62,34 @@ let knownCatInfo = null;
 // idle kittens free-roam and play fetch-with-themselves: whack the yarn ball,
 // chase it, whack it again. kitten id → play state.
 const kittenPlay = new Map();
+
+function useStyle(id) {
+  // An id this build doesn't have (a newer setting, a typo) keeps the style in use.
+  const art = NekomataArt[id];
+  if (!art || art === ART) return false;
+  ART = art;
+  UNIT = ART.px;
+  SCENE_W = ART.width;
+  SCENE_W_MAX = Math.round(2400 / UNIT);
+  sceneW = SCENE_W;
+  sceneH = ART.height;
+  canvas.width = sceneW;
+  canvas.height = sceneH;
+  document.documentElement.dataset.style = ART.id;
+  // Positions are in the old style's pixels: start the floor over, with no
+  // ceremonies for cats that were already here.
+  spots = [];
+  spotBySession.clear();
+  kittenPlay.clear();
+  adoptionRuns = [];
+  hiddenCatIds.clear();
+  knownCatInfo = null;
+  return true;
+}
+
+function requestedStyle() {
+  try { return new URLSearchParams(location.search).get("style"); } catch (error) { return null; }
+}
 
 function assignSpots(sessions) {
   // Deterministic seating: order by a hash of the (stable) session UUID, so a
@@ -180,7 +210,9 @@ function drawAdoptionRuns() {
   }
   const carrying = run.type === "arrive" ? run.phase === "in"
                                          : run.phase === "out";
-  ART.drawMan(pen, run.x, frame, carrying ? run.accent : null);
+  // arrivals come in from the left and leave that way; departures from the right
+  const heading = (run.type === "arrive") === (run.phase === "in") ? 1 : -1;
+  ART.drawMan(pen, run.x, frame, carrying ? run.accent : null, heading);
 }
 
 const lastStatusById = new Map();
@@ -550,6 +582,8 @@ function trackAdoptions(cats) {
 }
 
 function apply(data) {
+  // Glade hands the plugin's style setting over with its data
+  if (data.style) useStyle(data.style);
   fitSceneToViewport();
   const cats = data.sessions.filter((s) => !s.parent_id);
   // Freeze the layout while a departure is pending (or detected this cycle):
@@ -672,6 +706,8 @@ window.addEventListener("resize", () => {
   if (!latestData) return;
   if (widthChanged) apply(latestData); else renderOverlay(latestData);
 });
+document.documentElement.dataset.style = ART.id;
+useStyle(requestedStyle());
 fitSceneToViewport();
 if (typeof BOOTSTRAP === "object" && BOOTSTRAP) apply(BOOTSTRAP);
 drawScene();

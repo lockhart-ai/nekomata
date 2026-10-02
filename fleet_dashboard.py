@@ -25,6 +25,7 @@ from collections import defaultdict, deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
 PROJECTS_DIRECTORY = Path.home() / ".claude" / "projects"
 SESSION_ACTIVE_WINDOW_SECONDS = 900
@@ -692,10 +693,12 @@ def snapshot() -> dict:
 
 class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
-        if self.path == "/data":
+        # the page reads its own query (?style=…); the extension's watchdog adds ?revive=…
+        path = urlsplit(self.path).path
+        if path == "/data":
             body = json.dumps(snapshot()).encode("utf-8")
             content_type = "application/json"
-        elif self.path == "/":
+        elif path == "/":
             bootstrap = json.dumps(snapshot()).replace("</", "<\\/")
             body = PAGE_HTML.replace('"__BOOTSTRAP__"', bootstrap).encode("utf-8")
             content_type = "text/html; charset=utf-8"

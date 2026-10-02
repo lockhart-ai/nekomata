@@ -81,8 +81,9 @@ async function ensureServer() {
   );
 }
 
-function cafeHtml(port) {
+function cafeHtml(port, style) {
   const origin = `http://127.0.0.1:${port}`;
+  const styleQuery = `style=${encodeURIComponent(style)}`;
   return `<!doctype html>
 <html>
 <head>
@@ -95,7 +96,7 @@ function cafeHtml(port) {
 </style>
 </head>
 <body>
-<iframe id="cafe" src="${origin}/"></iframe>
+<iframe id="cafe" src="${origin}/?${styleQuery}"></iframe>
 <script>
   // Watchdog. The iframe's content process can be evicted or crash while the
   // server stays healthy, leaving a blank panel that only a manual webview
@@ -113,7 +114,7 @@ function cafeHtml(port) {
     lastReloadAt = Date.now();
     lastAliveAt = Date.now();
     pushesSinceAlive = 0;
-    cafe.src = "${origin}/?revive=" + Date.now() + "&why=" + reason;
+    cafe.src = "${origin}/?${styleQuery}&revive=" + Date.now() + "&why=" + reason;
   }
 
   // Relay data pushed by the extension host into the cafe iframe.
@@ -181,12 +182,19 @@ class NekomataViewProvider {
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = messageHtml("🐱 opening the cafe…");
     const port = config().get("port");
+    const showCafe = () => {
+      webviewView.webview.html = cafeHtml(port, config().get("style") || "8bit");
+    };
     try {
       await ensureServer();
-      webviewView.webview.html = cafeHtml(port);
+      showCafe();
     } catch (error) {
       webviewView.webview.html = messageHtml(String(error.message || error));
     }
+    // a new art style reloads the cafe with it
+    const styleWatcher = vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("nekomata.style")) showCafe();
+    });
     // Push data from the extension host (Node timers are never throttled,
     // unlike timers/rAF inside the webview iframe). The wrapper relays each
     // snapshot into the iframe via postMessage.
@@ -206,6 +214,7 @@ class NekomataViewProvider {
     webviewView.onDidDispose(() => {
       clearInterval(pusher);
       clearInterval(keepalive);
+      styleWatcher.dispose();
     });
   }
 }

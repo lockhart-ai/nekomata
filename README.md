@@ -29,6 +29,20 @@ yourself with `python3 fleet_dashboard.py --demo`.*
 
 Hover any cat or kitten for its full latest activity.
 
+## Art styles
+
+The cafe comes in more than one art style. The cats, their states and everything they do are
+the same in each; only the drawing changes.
+
+| Style | Look |
+|---|---|
+| `8bit` | The original: flat, chunky cats on big pixels. The default. |
+| `16bit` | A step finer: shaded cats with pale muzzles and happy eyes, and a little more room detail. |
+
+Pick one with the `nekomata.style` setting in your editor, or add `?style=16bit` to the page's
+address when you open it yourself. In Glade it is the plugin's **Art style** setting, once
+your Glade has plugin settings.
+
 ## Requirements
 
 - **macOS** (uses `ioreg`, `lsof`, and `ps` — Linux/Windows aren't supported yet).
@@ -113,6 +127,7 @@ Settings under `nekomata.*`:
 
 | Setting | Default | Description |
 |---|---|---|
+| `nekomata.style` | `8bit` | The art style: `8bit` or `16bit`. |
 | `nekomata.port` | `8787` | Port the server listens on. |
 | `nekomata.pythonPath` | `python3` | Python 3 interpreter for the server. |
 | `nekomata.serverScript` | *(bundled)* | Override path to `fleet_dashboard.py`. |
@@ -129,7 +144,8 @@ throttling VS Code applies to background webviews).
 The page itself is two layers. `web/app.js` decides what happens: who is working, waiting or
 asleep, where each cat sits, when the adoption man walks. An art style in `web/art/` draws it:
 the room, the cats and everything else, and where each thing goes. `web/art/8bit.js` is the
-original look. `node --test` replays a scripted minute and a half in the cafe without a
+original look, and its header describes what a style provides; a new file there is a new
+style. `node tools/scene-shot.mjs --style <id>` writes frames of a style as PNGs. `node --test` replays a scripted minute and a half in the cafe without a
 browser and checks every frame against `test/golden/`, so a change to the scene's behaviour
 can't quietly change what a style draws.
 
