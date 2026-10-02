@@ -69,6 +69,38 @@ describe("the scene", () => {
   });
 });
 
+describe("choosing a style", () => {
+  test("?style= picks it, and one this build doesn't have keeps the default", () => {
+    const pick = (search) => loadScene({ scripts: sceneScripts(), snapshot: cafeRun, search });
+    assert.equal(pick("").evaluate("ART.id"), "8bit");
+    assert.equal(pick("?style=16bit").evaluate("ART.id"), "16bit");
+    assert.equal(pick("?style=64bit").evaluate("ART.id"), "8bit");
+    assert.equal(pick("?revive=1&style=16bit").evaluate("ART.id"), "16bit");
+  });
+
+  test("a style handed over with the data swaps the scene while it runs", async () => {
+    let style;
+    const scene = loadScene({
+      scripts: sceneScripts(),
+      snapshot: (t, now) => ({ ...cafeRun(t, now), ...(style ? { style } : {}) }),
+    });
+    for (let frame = 0; frame < 80; frame++) await scene.frame();   // the visitor is being carried in
+    assert.deepEqual([scene.evaluate("ART.id"), scene.canvas.width, scene.canvas.height], ["8bit", 720, 360]);
+    style = "16bit";
+    for (let frame = 0; frame < 10; frame++) await scene.frame();
+    assert.deepEqual([scene.evaluate("ART.id"), scene.canvas.width, scene.canvas.height], ["16bit", 288, 144]);
+    assert.equal(scene.elements.overlay.innerHTML.includes("nametag"), true);
+    assert.equal(scene.evaluate("document.documentElement.dataset.style"), "16bit");
+    // the floor started over: nobody mid-ceremony, every cat seated
+    assert.equal(scene.evaluate("adoptionRuns.length"), 0);
+    assert.equal(scene.evaluate("spots.length"), scene.evaluate("spotBySession.size"));
+    style = "8bit";
+    for (let frame = 0; frame < 10; frame++) await scene.frame();
+    assert.deepEqual([scene.evaluate("ART.id"), scene.canvas.width], ["8bit", 720]);
+    assert.deepEqual(scene.problems, []);
+  });
+});
+
 describe("an art style", () => {
   test("each one registers itself with everything the scene asks of it", () => {
     const scene = loadScene({ scripts: sceneScripts(), snapshot: cafeRun });
