@@ -126,6 +126,13 @@ transcript files in `~/.claude/projects/`, then serve a canvas-rendered scene at
 alive, and pushes data into the view from the extension host (which sidesteps the timer
 throttling VS Code applies to background webviews).
 
+The page itself is two layers. `web/app.js` decides what happens: who is working, waiting or
+asleep, where each cat sits, when the adoption man walks. An art style in `web/art/` draws it:
+the room, the cats and everything else, and where each thing goes. `web/art/8bit.js` is the
+original look. `node --test` replays a scripted minute and a half in the cafe without a
+browser and checks every frame against `test/golden/`, so a change to the scene's behaviour
+can't quietly change what a style draws.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

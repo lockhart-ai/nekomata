@@ -733,10 +733,12 @@ describe("the plugin build", () => {
     assert.equal(icon, "icon.svg");
   });
 
-  test("its page is one self-contained file, with the adapter ahead of the scene", () => {
+  test("its page is one self-contained file, with the adapter and the art ahead of the scene", () => {
     const html = page();
     assert.ok(!html.includes("/*__STYLES__*/") && !html.includes("/*__APP__*/"));
     assert.ok(html.indexOf("NekomataGlade = api") < html.indexOf("const gladeFeed"));
+    // and the art styles ahead of the scene that draws with them
+    assert.ok(html.indexOf("NekomataArt[art.id] = art") < html.indexOf("const ART = "));
     assert.doesNotMatch(html, /<link\b|<script[^>]+src=|<img\b|url\(/i);
     assert.doesNotMatch(html, /https?:\/\//);
   });

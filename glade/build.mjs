@@ -2,12 +2,12 @@
 // Builds Nekomata as a Glade plugin: a folder Glade loads beside its terminal
 // (see "Glade" in the README). It holds manifest.json, the icon, and one
 // self-contained index.html: the same page the server serves, with
-// web/glade.js inlined ahead of app.js so the scene is fed by Glade's plugin
-// events instead of /data. Glade's sandbox allows inline script and style and
+// web/glade.js inlined ahead of the art and app.js so the scene is fed by Glade's
+// plugin events instead of /data. Glade's sandbox allows inline script and style and
 // nothing remote, so everything is inlined and nothing is fetched.
 //
 //   node glade/build.mjs [--out <dir>]   # default: dist/glade/nekomata
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -30,9 +30,15 @@ export function manifest() {
   };
 }
 
-/** The single inlined page: styles, then the Glade adapter and the scene. */
+/** The scene's scripts, in the order the page inlines them: the art styles, then the scene. */
+export function sceneScripts() {
+  const art = readdirSync(join(ROOT, "web", "art")).filter((name) => name.endsWith(".js")).sort();
+  return [...art.map((name) => `web/art/${name}`), "web/app.js"];
+}
+
+/** The single inlined page: styles, then the Glade adapter, the art and the scene. */
 export function page() {
-  const script = read("web/glade.js") + "\n" + read("web/app.js");
+  const script = ["web/glade.js", ...sceneScripts()].map(read).join("\n");
   if (/<\/script/i.test(script)) throw new Error("the inlined script must not contain </script");
   return read("web/index.html")
     .replace("/*__STYLES__*/", () => read("web/styles.css"))

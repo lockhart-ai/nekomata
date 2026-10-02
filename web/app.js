@@ -2,12 +2,17 @@
 // ------------------------------------------------------------ constants
 const PALETTE = ["#3987e5", "#199e70", "#c98500", "#008300",
                  "#9085e9", "#e66767", "#d55181", "#d95926"];
-const SCENE_W = 720, SCENE_H = 360, WALL_H = 92;
+// What the scene looks like is a style's business (web/art/): it draws the room, the cats
+// and everything else, and says where things sit. This file decides what happens. Scene
+// coordinates are the style's art pixels: ART.px scene pixels each on the 720x360 scene.
+const ART = NekomataArt["8bit"];
+const UNIT = ART.px;
+const SCENE_W = ART.width;
 // The scene is never narrower than SCENE_W, but it widens to match the
 // viewport's aspect ratio so the cafe fills its box instead of letterboxing.
-const SCENE_W_MAX = 2400;
+const SCENE_W_MAX = Math.round(2400 / UNIT);
 let sceneW = SCENE_W;
-let sceneH = SCENE_H;
+const sceneH = ART.height;
 let spots = [];
 const TOOL_ICONS = {
   Read: "\u{1F4D6}", Edit: "✏️", Write: "\u{1F4DD}", Bash: "\u{1F4BB}",
@@ -19,153 +24,18 @@ const TOOL_ICONS = {
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g,
   (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-// cat bitmaps: . transparent  S fur  T dark fur  K pupils  P nose/inner ear  W eye white
-// big round eyes + tiny nose + pear body + thick upright tail (reference-cat style)
-const CAT_SIT_A = [
-"..S..........S..",
-"..SS........SS..",
-"..SPS......SPS..",
-"..SSSSSSSSSSSS..",
-"..SSSSSSSSSSSS..",
-"..SSKSSSSKSSSS..",
-"..SKSKSSKSKSSS..",
-"..SSSSSSSSSSSS..",
-"..SSSSSPSSSSSS..",
-"...SSSSSSSSSS...",
-"....SSSSSSSS..SS",
-"...SSSSSSSSSS.SS",
-"..SSSSSSSSSSS.SS",
-"..SSSSSSSSSSS.SS",
-".SSSSSSSSSSSS.SS",
-".SSSSS.SSSSSS.SS",
-".SSSSS.SSSSSSSS.",
-"..SSS...SSS.....",
-];
-const CAT_SIT_B = [
-"..S..........S..",
-"..SS........SS..",
-"..SPS......SPS..",
-"..SSSSSSSSSSSS..",
-"..SSSSSSSSSSSS..",
-"..SSKSSSSKSSSS..",
-"..SKSKSSKSKSSS..",
-"..SSSSSSSSSSSS..",
-"..SSSSSPSSSSSS..",
-"...SSSSSSSSSS...",
-"....SSSSSSSS....",
-"...SSSSSSSSSS.SS",
-"..SSSSSSSSSSS.SS",
-"..SSSSSSSSSSS.SS",
-".SSSSSSSSSSSS.SS",
-".SSSSS.SSSSSS.SS",
-".SSSSS.SSSSSSSS.",
-"..SSS...SSS.....",
-];
-const CAT_SLEEP = [
-"..S..S..........",
-".SSSSSS..SSSS...",
-".SSSSSSSSSSSSSS.",
-".SKKSKKSSSSSSSS.",
-".SPSSSSSSSSSSSS.",
-".SSSSSSSSSSSSSS.",
-".SSSSSSSSSSSSSS.",
-"..SSSSSSSSSSSS..",
-"..TTTSSSSSSTT...",
-];
-// inhale: the flank swells one pixel
-const CAT_SLEEP_BREATHE = [
-"..S..S...SSSS...",
-".SSSSSS.SSSSSS..",
-".SSSSSSSSSSSSSS.",
-".SKKSKKSSSSSSSS.",
-".SPSSSSSSSSSSSS.",
-".SSSSSSSSSSSSSS.",
-".SSSSSSSSSSSSSS.",
-"..SSSSSSSSSSSS..",
-"..TTTSSSSSSTT...",
-];
-const KITTEN = [
-".S...S..",
-".SSSSS..",
-".SKSKS..",
-".SSSSS..",
-"SSSSSSS.",
-"SSSSSSST",
-".SS.SS..",
-];
-// the adoption man: short, bald, glasses, shirt & tie (H skin, G glasses,
-// W shirt, T tie, B pants, S shoes)
-const MAN_A = [
-".....HHHH.....",
-"....HHHHHH....",
-"....HHHHHH....",
-"...GGHHHHGG...",
-"....HHHHHH....",
-".....HHHH.....",
-"....WWWWWW....",
-"...WWWTTWWW...",
-"..WWWWTTWWWW..",
-"..WWWWTTWWWW..",
-".HWWWWTTWWWWH.",
-".HWWWWTTWWWWH.",
-"..WWWWWWWWWW..",
-"..WWWWWWWWWW..",
-"...WWWWWWWW...",
-"...BBBBBBBB...",
-"...BBBBBBBB...",
-"...BBB..BBB...",
-"...BBB..BBB...",
-"...BBB..BBB...",
-"...BBB..BBB...",
-"...BBB..BBB...",
-"...BBB..BBB...",
-"...BBB..BBB...",
-"...BBB..BBB...",
-"...BBB..BBB...",
-"..SSSS..SSSS..",
-];
-const MAN_B = [
-".....HHHH.....",
-"....HHHHHH....",
-"....HHHHHH....",
-"...GGHHHHGG...",
-"....HHHHHH....",
-".....HHHH.....",
-"....WWWWWW....",
-"...WWWTTWWW...",
-"..WWWWTTWWWW..",
-"..WWWWTTWWWW..",
-".HWWWWTTWWWWH.",
-".HWWWWTTWWWWH.",
-"..WWWWWWWWWW..",
-"..WWWWWWWWWW..",
-"...WWWWWWWW...",
-"...BBBBBBBB...",
-"...BBBBBBBB...",
-"..BBB....BBB..",
-"..BBB....BBB..",
-"..BBB....BBB..",
-"..BBB....BBB..",
-"..BBB....BBB..",
-"..BBB....BBB..",
-"..BBB....BBB..",
-"..BBB....BBB..",
-"..BBB....BBB..",
-".SSSS....SSSS.",
-];
-const MAN_COLORS = {H: "#eab68f", G: "#3a3230", W: "#fdfdfb",
-                    T: "#c0392b", B: "#4a4a48", S: "#2a2a28"};
-
 // ------------------------------------------------------------ scene state
 const canvas = document.getElementById("scene");
 const context = canvas.getContext("2d");
+canvas.height = sceneH;
+// what a style draws onto
+const pen = {
+  rect(x, y, w, h, color) { context.fillStyle = color; context.fillRect(x, y, w, h); },
+};
 
 function fitSceneToViewport() {
-  // Widen the logical scene to the viewport's aspect ratio. Floor props keep
-  // their coordinates on the left or are placed from the right edge at draw
-  // time. The wall props (window, pastry case, board, espresso machine) move
-  // together by half the extra width, so the group stays centred with its
-  // original arrangement intact.
+  // Widen the scene to the viewport's aspect ratio; the style lays its room
+  // out for whatever width it's given.
   const box = canvas.getBoundingClientRect();
   if (!box.width || !box.height) return false;
   const wanted = Math.min(SCENE_W_MAX,
@@ -173,11 +43,6 @@ function fitSceneToViewport() {
   if (wanted === sceneW) return false;
   sceneW = wanted;
   canvas.width = sceneW;
-  const wallShift = Math.round((sceneW - SCENE_W) / 2);
-  WINDOW.x = WINDOW_BASE_X + wallShift;
-  CASE.x = CASE_BASE_X + wallShift;
-  BOARD.x = BOARD_BASE_X + wallShift;
-  COFFEE.x = COFFEE_BASE_X + wallShift;
   return true;
 }
 const overlay = document.getElementById("overlay");
@@ -195,23 +60,6 @@ let knownCatInfo = null;
 // idle kittens free-roam and play fetch-with-themselves: whack the yarn ball,
 // chase it, whack it again. kitten id → play state.
 const kittenPlay = new Map();
-
-function computeSpots(count) {
-  // Cats spread evenly BOTH ways: a diagonal from upper-left to lower-right,
-  // so each family owns its own vertical band for bubbles and kittens.
-  const result = [];
-  if (!count) return result;
-  const lowLine = SCENE_H - 82;
-  const stagger = 44;
-  for (let i = 0; i < count; i++) {
-    // one equal-width band per cat, cat centered in its band
-    const centerX = Math.round(sceneW * (i + 0.5) / count);
-    const treeY = count <= 2 ? lowLine
-      : (i % 2 === 0 ? lowLine - stagger : lowLine);
-    result.push({kind: "tree", x: centerX - 39, y: treeY, post: 52});
-  }
-  return result;
-}
 
 function assignSpots(sessions) {
   // Deterministic seating: order by a hash of the (stable) session UUID, so a
@@ -254,160 +102,20 @@ function kittensOf(data, sessionId) {
   return data.sessions.filter((s) => s.parent_id === sessionId);
 }
 
-// ------------------------------------------------------------ pixel helpers
-function drawBitmap(rows, x, y, scale, colors) {
-  for (let r = 0; r < rows.length; r++) {
-    for (let c = 0; c < rows[r].length; c++) {
-      const key = rows[r][c];
-      if (key === ".") continue;
-      context.fillStyle = colors[key];
-      context.fillRect(x + c * scale, y + r * scale, scale, scale);
-    }
-  }
-}
-
-function rect(x, y, w, h, color) { context.fillStyle = color; context.fillRect(x, y, w, h); }
-
-function shade(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const dim = (v) => Math.max(0, Math.floor(v * 0.62));
-  return "#" + [dim(n >> 16 & 255), dim(n >> 8 & 255), dim(n & 255)]
-    .map((v) => v.toString(16).padStart(2, "0")).join("");
-}
-
-// ------------------------------------------------------------ room & props
-function drawRoom() {
-  rect(0, 0, sceneW, WALL_H, "#f0d0ae");
-  rect(0, 72, sceneW, 20, "#ddab80");
-  for (let sx = 0; sx < sceneW; sx += 24) rect(sx, 74, 1, 18, "#cb9a70");
-  rect(0, 72, sceneW, 2, "#b98a5e");
-  for (let ty = WALL_H; ty < sceneH; ty += 18) {
-    const plankRow = (ty - WALL_H) / 18;
-    rect(0, ty, sceneW, 18, plankRow % 2 ? "#c09678" : "#c89e80");
-    rect(0, ty, sceneW, 1, "#a87c62");
-    for (let sx = (plankRow % 3) * 48; sx < sceneW; sx += 144)
-      rect(sx, ty + 1, 1, 17, "#a87c62");
-  }
-}
-
-function drawBunting() {
-  rect(0, 2, sceneW, 2, "#b98a5e");
-  const colors = ["#f2a0b8", "#a8d8c0", "#f7d64a", "#c3b2e2"];
-  for (let i = 0; i < sceneW / 26; i++) {
-    const color = colors[i % colors.length];
-    const bx = i * 26 + 6;
-    rect(bx, 4, 12, 4, color); rect(bx + 2, 8, 8, 3, color); rect(bx + 4, 11, 4, 3, color);
-  }
-}
-
-function drawHangingPlant(x) {
-  rect(x + 8, 0, 4, 6, "#8a5f3c");
-  rect(x, 6, 20, 10, "#c47a52"); rect(x + 2, 14, 16, 3, "#a05f3e");
-  const vines = [[x + 3, 40], [x + 9, 26], [x + 15, 34]];
-  for (const [vx, length] of vines) {
-    rect(vx, 17, 2, length, "#2f7d33");
-    for (let ly = 20; ly < 17 + length; ly += 8) {
-      rect(vx - 3, ly, 3, 4, "#4aa64e");
-      rect(vx + 2, ly + 4, 3, 4, "#3c9440");
-    }
-  }
-}
-
-function drawCake(x, y, color, busy) {
-  rect(x, y + 4, 18, 9, color);
-  rect(x + 2, y, 14, 5, "#fff5ea");
-  if (busy) {
-    rect(x + 8, y - 4, 3, 4, frame % 2 ? "#ffd23e" : "#f28a3c");
-    rect(x + 8, y - 6, 3, 2, "#fff5ea");
-  } else {
-    rect(x + 7, y - 3, 4, 4, "#e05a6a");
-  }
-}
-
-const CASE_BASE_X = 170;
-const CASE = {x: CASE_BASE_X, y: 16};
-const CAKE_COLORS = ["#f2a0b8", "#a8d8a0", "#f7d64a", "#c3b2e2", "#f2b48a", "#a6dcf5"];
-function drawCase(containers) {
-  const {x, y} = CASE;
-  rect(x - 4, y - 4, 128, 72, "#b98a5e");
-  rect(x, y, 120, 62, "#faeedd");
-  rect(x + 2, y + 26, 116, 3, "#d9bf9c");
-  rect(x + 2, y + 52, 116, 3, "#d9bf9c");
-  const slots = [[x + 10, y + 14], [x + 50, y + 14], [x + 90, y + 14],
-                 [x + 10, y + 40], [x + 50, y + 40], [x + 90, y + 40]];
-  slots.forEach(([cakeX, cakeY], index) => {
-    const container = containers[index];
-    if (container) drawCake(cakeX, cakeY, CAKE_COLORS[index], container.cpu >= 20);
-  });
-  rect(x + 6, y + 3, 3, 56, "rgba(255,255,255,0.55)");
-  rect(x - 4, y + 62, 128, 10, "#8a5f3c");
-}
-
-const WINDOW_BASE_X = 30;
-const WINDOW = {x: WINDOW_BASE_X, y: 16};
-function drawWindow(load) {
-  const {x, y} = WINDOW;
-  const hot = load >= 70, warm = load >= 35;
-  rect(x - 4, y - 4, 128, 68, "#b98a5e");
-  rect(x, y, 120, 60, hot ? "#f7c791" : "#a6dcf5");
-  const cx = x + 17, cy = y + 17;
-  const radius = hot ? 12 : warm ? 9 : 7;
-  const sunColor = hot ? "#ff9d2e" : warm ? "#f7c93e" : "#f2dc8a";
-  rect(cx - radius, cy - radius, radius * 2, radius * 2, sunColor);
-  rect(cx - radius + 3, cy - radius + 3, radius * 2 - 6, radius * 2 - 6,
-    hot ? "#ffd23e" : "#f7e39a");
-  if (warm) {
-    const ray = (hot ? 8 : 5) + (hot && frame % 2 ? 3 : 0);
-    rect(cx - radius - 3 - ray, cy - 1, ray, 2, sunColor);
-    rect(cx + radius + 3, cy - 1, ray, 2, sunColor);
-    rect(cx - 1, cy - radius - 3 - ray, 2, ray, sunColor);
-    rect(cx - 1, cy + radius + 3, 2, ray, sunColor);
-  }
-  if (hot) {
-    const diagonal = radius + 4 + (frame % 2 ? 2 : 0);
-    rect(cx - diagonal - 2, cy - diagonal - 2, 3, 3, sunColor);
-    rect(cx + diagonal, cy - diagonal - 2, 3, 3, sunColor);
-    rect(cx - diagonal - 2, cy + diagonal, 3, 3, sunColor);
-    rect(cx + diagonal, cy + diagonal, 3, 3, sunColor);
-  }
-  if (!warm) {
-    rect(x + 40, y + 14, 22, 7, "#fdfdfb"); rect(x + 48, y + 10, 18, 6, "#fdfdfb");
-    rect(x + 84, y + 22, 20, 7, "#fdfdfb"); rect(x + 92, y + 18, 14, 5, "#fdfdfb");
-  }
-  rect(x, y + 40, 120, 20, "#a8d8a0");
-  rect(x + 58, y, 4, 60, "#b98a5e"); rect(x, y + 28, 120, 4, "#b98a5e");
-}
-
-const BOARD_BASE_X = 330;
-const BOARD = {x: BOARD_BASE_X, y: 10, w: 240, h: 70};
-function drawBoard() {
-  rect(BOARD.x - 5, BOARD.y - 5, BOARD.w + 10, BOARD.h + 10, "#8a5f3c");
-  rect(BOARD.x, BOARD.y, BOARD.w, BOARD.h, "#4e3a30");
-  rect(BOARD.x + 8, BOARD.y + BOARD.h - 4, 20, 3, "#f2e4cf");
-}
-
-function drawWaterBowl(x, y) {
-  rect(x, y, 24, 8, "#fffaf0"); rect(x + 2, y - 2, 20, 4, "#6db5e8");
-  rect(x + 30, y, 24, 8, "#fffaf0"); rect(x + 2, y + 8, 52, 2, "#c9976e");
-  rect(x + 33, y - 2, 18, 4, "#c47a52");
-}
-
-function drawYarn(x, y, color) {
-  rect(x + 2, y, 8, 12, color); rect(x, y + 2, 12, 8, color);
-  rect(x + 2, y + 4, 8, 1, shade(color)); rect(x + 4, y + 7, 8, 1, shade(color));
-  rect(x + 10, y + 10, 14, 2, shade(color));
-}
-
+// ------------------------------------------------------------ kittens at play
 const KITTEN_YARN_COLORS = ["#e05a6a", "#9085e9", "#f7d64a", "#6db5e8"];
 
 function advanceKittenPlay(play) {
-  const minX = 24, maxX = sceneW - 24, minY = 135, maxY = sceneH - 18;
+  // distances are scene pixels of the 720x360 scene, so play looks alike in every style
+  const minX = 24 / UNIT, maxX = sceneW - 24 / UNIT;
+  const minY = ART.playTop, maxY = sceneH - 18 / UNIT;
+  const still = 1 / UNIT;
   play.ballX += play.ballVX;
   play.ballY += play.ballVY;
   play.ballVX *= 0.72;
   play.ballVY *= 0.72;
-  if (Math.abs(play.ballVX) < 1) play.ballVX = 0;
-  if (Math.abs(play.ballVY) < 1) play.ballVY = 0;
+  if (Math.abs(play.ballVX) < still) play.ballVX = 0;
+  if (Math.abs(play.ballVY) < still) play.ballVY = 0;
   if (play.ballX < minX) { play.ballX = minX; play.ballVX = Math.abs(play.ballVX); }
   if (play.ballX > maxX) { play.ballX = maxX; play.ballVX = -Math.abs(play.ballVX); }
   if (play.ballY < minY) { play.ballY = minY; play.ballVY = Math.abs(play.ballVY); }
@@ -415,129 +123,25 @@ function advanceKittenPlay(play) {
   const dx = play.ballX - play.x;
   const dy = play.ballY - play.y;
   const dist = Math.hypot(dx, dy) || 1;
-  if (dist > 16) {
-    const step = Math.min(9, dist);
+  if (dist > 16 / UNIT) {
+    const step = Math.min(9 / UNIT, dist);
     play.x += (dx / dist) * step;
     play.y += (dy / dist) * step;
     play.x = Math.min(maxX, Math.max(minX, play.x));
     play.y = Math.min(maxY, Math.max(minY, play.y));
   } else if (!play.ballVX && !play.ballVY) {
     const angle = Math.random() * Math.PI * 2;      // WHACK
-    const power = 18 + Math.random() * 26;
+    const power = (18 + Math.random() * 26) / UNIT;
     play.ballVX = Math.cos(angle) * power;
     play.ballVY = Math.sin(angle) * power * 0.5;
   }
 }
 
-function drawMiniYarn(x, y, color) {
-  rect(x + 1, y, 6, 8, color); rect(x, y + 1, 8, 6, color);
-  rect(x + 2, y + 3, 5, 1, shade(color));
-  rect(x + 7, y + 5, 6, 2, shade(color));
-}
-
-const COFFEE_BASE_X = 600;
-const COFFEE = {x: COFFEE_BASE_X, y: 26};
-function drawCoffee(pct) {
-  const {x, y} = COFFEE;
-  const heat = pct == null ? 0 : pct;
-  const busy = heat > 5;
-  rect(x - 6, y + 32, 88, 6, "#b98a5e");                                 // shelf
-  rect(x, y, 36, 30, "#b8b4ac"); rect(x - 2, y - 3, 40, 5, "#8f8b84");   // body
-  rect(x + 6, y + 8, 24, 8, "#6a6660");                                  // band
-  rect(x + 14, y + 18, 8, 6, "#8f8b84");                                 // group head
-  rect(x + 30, y + 4, 4, 4,
-    busy ? (frame % 2 ? "#e05a6a" : "#a04050") : "#5a5650");             // brew light
-  rect(x + 12, y + 26, 12, 6, "#fff5ea");                                // cup
-  if (busy && frame % 2)
-    rect(x + 18, y + 24, 2, 3, "#6a4a30");                               // pour
-  if (heat >= 25) {                                                      // steam
-    const wave = frame % 2 ? 2 : 0;
-    rect(x + 13 + wave, y - 9, 2, 5, "#efe8dc");
-    rect(x + 22 - wave, y - 11, 2, 6, "#efe8dc");
-    if (heat >= 60) rect(x + 5 + wave, y - 12, 2, 7, "#efe8dc");
-  }
-  rect(x + 48, y + 22, 10, 10, "#f2a0b8"); rect(x + 58, y + 25, 3, 4, "#f2a0b8");
-  rect(x + 66, y + 22, 10, 10, "#a8d8c0"); rect(x + 76, y + 25, 3, 4, "#a8d8c0");
-}
-
-function drawPlant(x, y) {
-  rect(x + 6, y + 14, 12, 12, "#c47a52"); rect(x + 8, y + 24, 8, 3, "#a05f3e");
-  rect(x + 4, y + 2, 6, 12, "#2f7d33"); rect(x + 12, y, 6, 14, "#3c9440");
-  rect(x + 9, y + 6, 5, 10, "#2f7d33");
-  rect(x + 3, y, 4, 4, "#f2a0b8"); rect(x + 15, y - 3, 4, 4, "#e05a6a");
-}
-
 // ------------------------------------------------------------ spots & cats
-function spotGeometry(spot) {
-  const platformY = spot.y - spot.post - 14;
-  return {catCenterX: spot.x + 39, catBottom: platformY + 10,
-          nameX: spot.x + 39, nameY: spot.y + 14,
-          laptopX: spot.x + 24, laptopY: platformY + 8};
-}
-
-function kittenPlacement(parentSlot, index) {
-  // One kitten per vertical slot up the tree, alternating sides of the trunk:
-  // slot 0 kitten-left, slot 1 kitten-right, … (its bubble takes the other side)
-  const spot = spots[parentSlot];
-  const geometry = spotGeometry(spot);
-  const side = index % 2 === 0 ? -1 : 1;
-  return {centerX: geometry.catCenterX + side * 56,
-          bottom: spot.y + 6 - index * 30,
-          side};
-}
-
 function kittenLabel(kitten) {
   const title = (kitten.title || "").trim();
   if (title && !/^you are /i.test(title)) return title;
   return "⑂ " + kitten.id.replace(/^agent-/, "").slice(0, 7);
-}
-
-function drawLaptop(x, y, accent, mode, pendingCount, flash) {
-  if (mode === "closed") {
-    rect(x, y - 4, 28, 4, "#3a3a38"); rect(x, y - 4, 28, 1, "#4c4c4a");
-    return;
-  }
-  rect(x, y, 30, 3, "#3a3a38");
-  rect(x + 3, y - 16, 24, 16, "#2a2a28");
-  rect(x + 5, y - 14, 20, 12, mode === "lit" ? "#122633" : "#1c1c1b");
-  if (mode === "lit") {
-    rect(x + 3, y - 18, 24, 2, accent);
-    for (let i = 0; i < 3; i++)
-      rect(x + 7, y - 12 + i * 4, 5 + ((frame + i) % 3) * 4, 2, "#5598e7");
-  } else if (mode === "spinner") {
-    if (flash) {
-      rect(x + 5, y - 14, 20, 12, "#3f9a55");
-      return;
-    }
-    const centerX = x + 15, centerY = y - 8;
-    for (let trail = 0; trail < 4; trail++) {
-      const angle = (((frame * 2) - trail) % 8 + 8) % 8 / 8 * Math.PI * 2;
-      rect(Math.round(centerX + Math.cos(angle) * 5) - 1,
-           Math.round(centerY + Math.sin(angle) * 3) - 1, 2, 2,
-           trail === 0 ? "#8fd0ff" : "#3d6f9e");
-    }
-    for (let dot = 0; dot < Math.min(5, pendingCount || 0); dot++)
-      rect(x + 7 + dot * 4, y - 4, 2, 2, "#f7d64a");
-  }
-}
-
-function drawTree(spot) {
-  const platformY = spot.y - spot.post - 14;
-  rect(spot.x + 6, spot.y, 66, 10, "#a5744a");
-  rect(spot.x + 6, spot.y, 66, 2, "#bc8a60");
-  rect(spot.x + 30, platformY + 14, 18, spot.post, "#d9b98c");
-  for (let sy = platformY + 18; sy < spot.y - 2; sy += 8)
-    rect(spot.x + 30, sy, 18, 2, "#c5a577");
-  rect(spot.x, platformY, 78, 14, "#a5744a");
-  rect(spot.x + 4, platformY + 2, 70, 6, "#ecd9b0");
-}
-
-function drawMan(x, feetY, carrying, accent) {
-  const rows = frame % 2 ? MAN_B : MAN_A;
-  drawBitmap(rows, x - 21, feetY - rows.length * 3, 3, MAN_COLORS);
-  if (carrying)
-    drawBitmap(CAT_SLEEP, x - 16, feetY - 74, 2,
-      {S: accent, T: shade(accent), K: "#141412", P: "#f0937e", W: "#fffdf7"});
 }
 
 function drawAdoptionRuns() {
@@ -545,22 +149,18 @@ function drawAdoptionRuns() {
   // the tree only vanishes once the cat is in his arms.
   for (const waiting of adoptionRuns) {
     if (waiting.type === "depart" && waiting.phase === "in" && waiting.ghost) {
-      drawTree(waiting.ghost.spot);
-      const ghostGeometry = spotGeometry(waiting.ghost.spot);
-      drawBitmap(Math.floor(frame / 3) % 2 ? CAT_SLEEP_BREATHE : CAT_SLEEP,
-        ghostGeometry.catCenterX - 24,
-        ghostGeometry.catBottom - CAT_SLEEP.length * 3, 3,
-        {S: waiting.accent, T: shade(waiting.accent), K: "#141412",
-         P: "#f0937e", W: "#fffdf7"});
+      ART.drawTree(pen, waiting.ghost.spot, waiting.accent, frame, 0);
+      ART.drawCat(pen, waiting.ghost.spot, waiting.accent,
+        {status: "idle", laptop: null}, frame);
     }
   }
   // There is only one adoption man; ceremonies queue and he handles them
   // one at a time. Queued arrivals stay hidden until he delivers them.
   const run = adoptionRuns[0];
   if (!run) return;
-  const feetY = sceneH - 16;
-  const speed = 20;
-  if (run.x === null) run.x = run.type === "arrive" ? -40 : sceneW + 40;
+  const speed = 20 / UNIT;
+  const offstage = 40 / UNIT;
+  if (run.x === null) run.x = run.type === "arrive" ? -offstage : sceneW + offstage;
   if (run.phase === "in") {
     run.x += run.type === "arrive" ? speed : -speed;
     const reached = run.type === "arrive" ? run.x >= run.targetX
@@ -572,7 +172,7 @@ function drawAdoptionRuns() {
     }
   } else {
     run.x += run.type === "arrive" ? -speed : speed;
-    if (run.x < -60 || run.x > sceneW + 60) {
+    if (run.x < -60 / UNIT || run.x > sceneW + 60 / UNIT) {
       if (run.type === "arrive") hiddenCatIds.delete(run.id);
       adoptionRuns.shift();
       return;
@@ -580,33 +180,9 @@ function drawAdoptionRuns() {
   }
   const carrying = run.type === "arrive" ? run.phase === "in"
                                          : run.phase === "out";
-  drawMan(run.x, feetY, carrying, run.accent);
+  ART.drawMan(pen, run.x, frame, carrying ? run.accent : null);
 }
 
-const BLINK_ROW_TOP = "..SSSSSSSSSSSS..";
-const BLINK_ROW_BOTTOM = "..SKKKSSKKKSSS..";
-
-// jolted awake: saucer eyes, fur spiked out in all directions
-const CAT_STARTLED = [
-"..S..S....S..S..",
-"..SS.S....S.SS..",
-"..SPSSSSSSSSPS..",
-".SSSSSSSSSSSSSS.",
-"S.SSSSSSSSSSSS.S",
-"..SWWWSSWWWSSS..",
-"..SWKWSSWKWSSS..",
-"..SWWWSSWWWSSS..",
-"..SSSSSPSSSSSS..",
-"...SSSSSSSSSS...",
-"..S.SSSSSSSS.S..",
-".S.SSSSSSSSSS.S.",
-"..SSSSSSSSSSS.SS",
-".SSSSSSSSSSSS.SS",
-"S.SSSSSSSSSSS.SS",
-".SSSSS.SSSSSS.SS",
-".SSSSS.SSSSSSSS.",
-"..SSS...SSS.....",
-];
 const lastStatusById = new Map();
 const startledUntil = new Map();
 const previousPendingById = new Map();
@@ -618,13 +194,12 @@ function seedFor(id) {
   return Math.abs(hash);
 }
 
-function drawSpotWithCat(slot, session, now) {
+function drawSpotWithCat(slot, session, now, workingKittens) {
   if (!session) return;
   const spot = spots[slot];
-  const geometry = spotGeometry(spot);
   const accent = accentFor(session.id);
   const status = sessionStatus(session, now);
-  drawTree(spot);
+  ART.drawTree(pen, spot, accent, frame, workingKittens);
   if (hiddenCatIds.has(session.id)) return;  // still in the adoption man's arms
   const previousStatus = lastStatusById.get(session.id);
   if (previousStatus === "idle" && status !== "idle")
@@ -647,62 +222,26 @@ function drawSpotWithCat(slot, session, now) {
     taskFlashUntil.set(session.id, frame + 3);
   previousPendingById.set(session.id, session.pending_tasks);
   const seed = seedFor(session.id);
-  let rows;
-  if (status === "idle")
-    rows = Math.floor(frame / 3) % 2 ? CAT_SLEEP_BREATHE : CAT_SLEEP;
-  else if (startled) rows = CAT_STARTLED;
-  else if (waiting) rows = CAT_SIT_A;                  // sitting with its coffee
-  else if (raisingHand) rows = CAT_SIT_A;              // sitting, paw up (overlay)
-  else if (status === "working") rows = frame % 2 ? CAT_SIT_B : CAT_SIT_A;
-  else rows = Math.floor(frame / 3) % 2 ? CAT_SIT_B : CAT_SIT_A;
-  if (status !== "idle" && !startled) {
-    if ((frame + seed) % 13 === 0)                     // blink ~every 4s
-      rows = rows.map((row, i) =>
-        i === 5 ? BLINK_ROW_TOP : i === 6 ? BLINK_ROW_BOTTOM : row);
-    if (!waiting && !raisingHand &&                     // never turn away while waiting
-        Math.floor((frame + seed) / 26) % 2)
-      rows = rows.map((row) => [...row].reverse().join(""));
-  }
-  const shake = startled ? (frame % 2 ? 2 : -2) : 0;
-  const bob = status === "working" && !waiting && frame % 2 ? 1 : 0;
-  drawBitmap(rows, geometry.catCenterX - 24 + shake,
-    geometry.catBottom - rows.length * 3 + bob, 3,
-    {S: accent, T: shade(accent), K: "#141412", P: "#f0937e", W: "#fffdf7"});
-  if (startled) {
-    const markX = geometry.catCenterX + 32;
-    const markTop = geometry.catBottom - rows.length * 3 - 18;
-    rect(markX, markTop, 4, 10, "#43302a");
-    rect(markX, markTop + 13, 4, 4, "#43302a");
-  }
-  if (waiting) {
-    // coffee break: mug held at the side, raised for a sip every so often
-    const sipping = ((frame + seed + 10) % 20) < 2;
-    const mugX = geometry.catCenterX + (sipping ? 6 : 16);
-    const mugY = geometry.catBottom - (sipping ? 40 : 22);
-    rect(mugX, mugY, 9, 8, "#fff5ea");
-    rect(mugX + 9, mugY + 2, 3, 4, "#fff5ea");
-    rect(mugX + 1, mugY + 1, 7, 2, "#6a4a30");
-    if (frame % 2) {
-      rect(mugX + 2, mugY - 5, 2, 3, "#efe8dc");
-      rect(mugX + 5, mugY - 8, 2, 3, "#efe8dc");
-    }
-  }
-  if (raisingHand) {
-    // one front paw lifted and waving at shoulder height — "over here!"
-    const spriteTop = geometry.catBottom - rows.length * 3;
-    const up = Math.floor(frame / 2) % 2;
-    const pawX = geometry.catCenterX - 32;
-    const pawY = spriteTop + (up ? 14 : 22);
-    rect(pawX + 7, pawY + 4, 9, 6, shade(accent));   // forearm to the body
-    rect(pawX, pawY, 10, 9, accent);                 // paw
-    rect(pawX + 2, pawY + 2, 5, 3, "#f0937e");       // toe beans
-  }
-  const laptopMode = waiting ? "spinner" :
-    raisingHand ? "open" :
-    status === "working" ? "lit" :
-    status === "thinking" ? "open" : "closed";
-  drawLaptop(geometry.laptopX, geometry.laptopY, accent, laptopMode,
-    session.pending_tasks, (taskFlashUntil.get(session.id) || 0) > frame);
+  const settled = status !== "idle" && !startled;
+  ART.drawCat(pen, spot, accent, {
+    status, startled, waiting, raisingHand,
+    blink: settled && (frame + seed) % 13 === 0,       // blink ~every 4s
+    // never turn away while waiting
+    turned: settled && !waiting && !raisingHand && Math.floor((frame + seed) / 26) % 2 === 1,
+    // coffee break: the mug is raised for a sip every so often
+    sipping: waiting && ((frame + seed + 10) % 20) < 2,
+    laptop: waiting ? "spinner" :
+      raisingHand ? "open" :
+      status === "working" ? "lit" :
+      status === "thinking" ? "open" : "closed",
+    pending: session.pending_tasks,
+    flash: (taskFlashUntil.get(session.id) || 0) > frame,
+  }, frame);
+}
+
+function workingKittensOf(data, sessionId) {
+  return kittensOf(data, sessionId).filter((kitten) =>
+    sessionStatus(kitten, data.generated_at) === "working").length;
 }
 
 function drawScene() {
@@ -712,26 +251,18 @@ function drawScene() {
     ? data.history[data.history.length - 1] : null;
   const cpuLoad = latest && data.cpu_count
     ? (latest.total / data.cpu_count) * 100 : 0;
-  drawRoom();
-  drawWindow(cpuLoad);
-  drawCase(data ? data.docker : []);
-  drawBoard();
-  drawBunting();
-  drawHangingPlant(4);
-  drawHangingPlant(sceneW - 21);
-  drawWaterBowl(sceneW - 106, 330);
-  drawCoffee(data ? data.gpu : null);
-  drawYarn(206, 332, "#e66767");
-  drawYarn(sceneW - 160, 324, "#9085e9");
-  drawPlant(16, 106);
+  ART.drawBackdrop(pen, sceneW, frame,
+    {cpuLoad, docker: data ? data.docker : [], gpu: data ? data.gpu : null});
   const now = data ? data.generated_at : 0;
   const bySlot = new Map();
   if (data) for (const session of data.sessions) {
     const slot = spotBySession.get(session.id);
     if (slot !== undefined) bySlot.set(slot, session);
   }
-  for (let slot = 0; slot < spots.length; slot++)
-    drawSpotWithCat(slot, bySlot.get(slot) || null, now);
+  for (let slot = 0; slot < spots.length; slot++) {
+    const session = bySlot.get(slot) || null;
+    drawSpotWithCat(slot, session, now, session ? workingKittensOf(data, session.id) : 0);
+  }
   if (data) for (const session of data.sessions) {
     const slot = spotBySession.get(session.id);
     if (slot === undefined || hiddenCatIds.has(session.id)) continue;
@@ -740,29 +271,21 @@ function drawScene() {
     kittens.forEach((kitten, index) => {
       const accent = accentFor(session.id);
       const working = sessionStatus(kitten, now) === "working";
-      const place = kittenPlacement(slot, working ? workingSlot++ : index);
-      const kittenColors =
-        {S: accent, T: shade(accent), K: "#141412", P: "#f0937e", W: "#fffdf7"};
+      const place = ART.kittenPlace(spots[slot], working ? workingSlot++ : index);
       const yarnColor = KITTEN_YARN_COLORS[index % KITTEN_YARN_COLORS.length];
       if (working) {
         kittenPlay.delete(kitten.id);
-        drawBitmap(KITTEN, place.centerX - 12,
-          place.bottom - KITTEN.length * 3 + (frame % 2 ? 2 : 0), 3, kittenColors);
-        const batted = ((frame + index) % 3) - 1;
-        const hop = (frame + index) % 2 ? 2 : 0;
-        drawMiniYarn(place.centerX - 4 + batted * 5, place.bottom - 4 - hop, yarnColor);
+        ART.drawKittenWorking(pen, place, accent, frame, index, yarnColor);
       } else {
         let play = kittenPlay.get(kitten.id);
         if (!play) {
           play = {x: place.centerX, y: place.bottom,
-                  ballX: place.centerX + 22, ballY: place.bottom + 14,
+                  ballX: place.centerX + 22 / UNIT, ballY: place.bottom + 14 / UNIT,
                   ballVX: 0, ballVY: 0};
           kittenPlay.set(kitten.id, play);
         }
         advanceKittenPlay(play);
-        drawMiniYarn(play.ballX - 4, play.ballY - 4, yarnColor);
-        drawBitmap(KITTEN, play.x - 12,
-          play.y - KITTEN.length * 3 + (frame % 2 ? 1 : 0), 3, kittenColors);
+        ART.drawKittenPlaying(pen, play, accent, frame, yarnColor);
       }
     });
   }
@@ -871,36 +394,35 @@ function hoverData(session, now) {
 function renderOverlay(data) {
   const now = data.generated_at;
   const scale = sceneScale();
-  const bubbleFont = Math.max(9, Math.min(12, 11 * scale));
+  // text is sized against the 720x360 scene, whatever the style's own pixel size
+  const textScale = scale / UNIT;
+  const bubbleFont = Math.max(9, Math.min(12, 11 * textScale));
   // a bubble may fill at most its cat's equal share of the floor width
   const bandScreen = Math.round((sceneW / Math.max(1, spots.length)) * scale) - 12;
   const bubbleSize = `font-size:${bubbleFont.toFixed(1)}px;` +
     `max-width:${Math.max(90, Math.min(300, bandScreen))}px;`;
   const miniBubbleSize = `font-size:${bubbleFont.toFixed(1)}px;` +
     `max-width:${Math.max(80, Math.min(170, bandScreen))}px;`;
-  const nameFont = `font-size:${Math.max(8, Math.min(12, 11 * scale)).toFixed(1)}px;`;
+  const nameFont = `font-size:${Math.max(8, Math.min(12, 11 * textScale)).toFixed(1)}px;`;
   const pieces = [];
   for (const session of data.sessions) {
     const slot = spotBySession.get(session.id);
     if (slot === undefined || hiddenCatIds.has(session.id)) continue;
     const spot = spots[slot];
-    const geometry = spotGeometry(spot);
     const status = sessionStatus(session, now);
-    const event = lastEvent(session);
-    const catHeight = (status === "idle" ? CAT_SLEEP.length : CAT_SIT_A.length) * 3;
-    const namePosition = scenePosition(geometry.nameX, geometry.nameY);
+    const anchors = ART.catAnchors(spot, status === "idle");
+    const namePosition = scenePosition(anchors.nameX, anchors.nameY);
     const content = bubbleContentFor(session, status, now);
     // Family bubble stack: parent bubble at its head, kitten bubbles flowing
     // DOWNWARD in discrete one-line slots, alternating left/right columns.
-    const stackAnchorY = geometry.catBottom - catHeight - 8;
-    const parentPosition = scenePosition(geometry.catCenterX, stackAnchorY);
+    const parentPosition = scenePosition(anchors.x, anchors.bubbleY);
     if (content)
       pieces.push(`<div class="bubble ${status === "idle" ? "zzz" : ""}"` +
         ` style="left:${parentPosition.left}px;top:${parentPosition.top}px;${bubbleSize}">` +
         `${content}</div>`);
     const catHover = hoverData(session, now);
-    const catBox = scenePosition(geometry.catCenterX - 26, geometry.catBottom - 58);
-    const catBoxEnd = scenePosition(geometry.catCenterX + 26, geometry.catBottom + 4);
+    const catBox = scenePosition(anchors.hover.x0, anchors.hover.y0);
+    const catBoxEnd = scenePosition(anchors.hover.x1, anchors.hover.y1);
     pieces.push(`<div class="hover-target"` +
       ` style="left:${catBox.left}px;top:${catBox.top}px;` +
       `width:${catBoxEnd.left - catBox.left}px;height:${catBoxEnd.top - catBox.top}px"` +
@@ -915,13 +437,13 @@ function renderOverlay(data) {
     let workingSlot = 0;
     kittens.forEach((kitten, index) => {
       const working = sessionStatus(kitten, now) === "working";
-      const place = kittenPlacement(slot, working ? workingSlot++ : index);
+      const place = ART.kittenPlace(spot, working ? workingSlot++ : index);
       const play = kittenPlay.get(kitten.id);
-      const kittenX = play ? play.x : place.centerX;
-      const kittenY = play ? play.y : place.bottom;
+      const kittenBox = ART.kittenHover(play ? play.x : place.centerX,
+        play ? play.y : place.bottom);
       const kittenHover = hoverData(kitten, now);
-      const hoverBox = scenePosition(kittenX - 14, kittenY - 24);
-      const hoverBoxEnd = scenePosition(kittenX + 14, kittenY + 4);
+      const hoverBox = scenePosition(kittenBox.x0, kittenBox.y0);
+      const hoverBoxEnd = scenePosition(kittenBox.x1, kittenBox.y1);
       pieces.push(`<div class="hover-target"` +
         ` style="left:${hoverBox.left}px;top:${hoverBox.top}px;` +
         `width:${hoverBoxEnd.left - hoverBox.left}px;` +
@@ -934,8 +456,8 @@ function renderOverlay(data) {
       if (kittenContent) {
         // speech hugs the kitten's inner shoulder, extending across the trunk
         const bubbleSide = -place.side;
-        const anchor = scenePosition(place.centerX + bubbleSide * 16,
-          place.bottom - 10);
+        const bubbleAt = ART.kittenBubble(place);
+        const anchor = scenePosition(bubbleAt.x, bubbleAt.y);
         pieces.push(`<div class="bubble mini ` +
           `${bubbleSide > 0 ? "side-right" : "side-left"}"` +
           ` style="left:${anchor.left}px;top:${anchor.top}px;` +
@@ -946,8 +468,9 @@ function renderOverlay(data) {
   // chalkboard: live commands
   const commands = data.trees.flatMap((tree) =>
     tree.rows.filter((row) => row.is_wrapper).map((row) => row.command));
-  const boardTopLeft = scenePosition(BOARD.x + 6, BOARD.y + 5);
-  const boardBottomRight = scenePosition(BOARD.x + BOARD.w - 6, BOARD.y + BOARD.h - 5);
+  const board = ART.boardText(sceneW);
+  const boardTopLeft = scenePosition(board.x0, board.y0);
+  const boardBottomRight = scenePosition(board.x1, board.y1);
   const boardWidth = boardBottomRight.left - boardTopLeft.left;
   const fontPx = Math.max(8, Math.round(boardWidth / 34));
   pieces.push(`<div class="board-text" style="left:${boardTopLeft.left}px;` +
@@ -995,18 +518,13 @@ function renderCorner(data) {
     ` · ${new Date().toLocaleTimeString()}`;
 }
 
-function postForKittens(kittenCount) {
-  // One kitten slot per level, so the post grows with the litter — capped so
-  // the platform never crowds the wall labels.
-  return Math.min(116, 52 + 30 * Math.max(0, kittenCount - 1));
-}
 
 function trackAdoptions(cats) {
   const currentInfo = new Map();
   for (const cat of cats) {
     const slot = spotBySession.get(cat.id);
     if (slot === undefined || !spots[slot]) continue;
-    currentInfo.set(cat.id, {x: spotGeometry(spots[slot]).catCenterX,
+    currentInfo.set(cat.id, {x: ART.catAnchors(spots[slot], false).x,
                              accent: accentFor(cat.id),
                              spot: {...spots[slot]}});
   }
@@ -1042,15 +560,13 @@ function apply(data) {
     [...knownCatInfo.keys()].some((id) => !liveIds.has(id));
   const departurePending = adoptionRuns.some((run) => run.type === "depart");
   if (!departureDetected && !departurePending) {
-    spots = computeSpots(cats.length);
+    spots = ART.spots(cats.length, sceneW);
     assignSpots(cats);
   }
   for (const [sessionId, slot] of spotBySession)
-    if (spots[slot]) {
-      const workingKittens = kittensOf(data, sessionId).filter((kitten) =>
-        sessionStatus(kitten, data.generated_at) === "working").length;
-      spots[slot].post = postForKittens(workingKittens);
-    }
+    // one kitten slot per level, so the post grows with the litter
+    if (spots[slot])
+      spots[slot].post = ART.postFor(workingKittensOf(data, sessionId));
   trackAdoptions(cats);
   const kittenIds = new Set(
     data.sessions.filter((s) => s.parent_id).map((s) => s.id));
