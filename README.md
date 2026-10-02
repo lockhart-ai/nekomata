@@ -31,18 +31,28 @@ Hover any cat or kitten for its full latest activity.
 
 ## Art styles
 
-The cafe comes in more than one art style. The cats, their states and everything they do are
-the same in each; only the drawing changes.
+The cafe comes in three art styles. The cats, their states and everything they do are the
+same in each; only the drawing changes. Below is the same moment in all three: a sleeping
+cat, a working cat with its kittens, another at work, one raising a paw and one on a coffee
+break. (These are the scene alone, without the speech bubbles and name labels drawn over it.)
 
-| Style | Look |
-|---|---|
-| `8bit` | The original: flat, chunky cats on big pixels. The default. |
-| `16bit` | A step finer: shaded cats with pale muzzles and happy eyes, and a little more room detail. |
-| `32bit` | The cosiest: round, outlined cats with stripes and blush, in a panelled room with a rug. |
+**`8bit`** — the original, and the default: flat, chunky cats on big pixels.
+
+![The cafe in the 8bit style](docs/style-8bit.png)
+
+**`16bit`** — a step finer: shaded cats with pale muzzles and happy eyes, and a little more
+room detail.
+
+![The cafe in the 16bit style](docs/style-16bit.png)
+
+**`32bit`** — the cosiest: round, outlined cats with stripes and blush, in a panelled room
+with a rug.
+
+![The cafe in the 32bit style](docs/style-32bit.png)
 
 Pick one with the `nekomata.style` setting in your editor, or add `?style=16bit` to the page's
-address when you open it yourself. In Glade it is the plugin's **Art style** setting, once
-your Glade has plugin settings.
+address when you open it yourself. In Glade it is the plugin's **Art style** setting, under
+Settings › Plugins.
 
 ## Requirements
 
