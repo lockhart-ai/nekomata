@@ -9,7 +9,9 @@ import { describe, test } from "node:test";
 import { build, manifest, page } from "../glade/build.mjs";
 
 const require = createRequire(import.meta.url);
-const { createModel, statusText, connect, KITTEN_LINGER_MS, CAT_IDLE_WINDOW_MS } = require("../web/glade.js");
+const {
+  createModel, statusText, connect, formatBytes, KITTEN_LINGER_MS, CAT_IDLE_WINDOW_MS, MAX_MACHINE_HISTORY,
+} = require("../web/glade.js");
 
 // ------------------------------------------------------------------ fixtures
 const NOW = Date.parse("2026-09-25T10:00:00Z");
@@ -96,8 +98,9 @@ describe("snapshot", () => {
     assert.equal(cat(model, "t1").branch, "");
   });
 
-  test("the room's machine readings stay empty", () => {
+  test("without the machine capability, the room's machine readings stay empty", () => {
     const data = fed(snapshot({ tasks: [task("t1")] })).scene(NOW);
+    assert.equal(data.cpu_count, 0);
     assert.equal(data.gpu, null);
     assert.deepEqual(data.docker, []);
     assert.deepEqual(data.history, []);
@@ -113,6 +116,100 @@ describe("snapshot", () => {
     assert.equal(pose(cat(model, "t1")), "paw");
     assert.equal(pose(cat(model, "t2")), "paw");
     assert.equal(pose(cat(model, "t3")), "asleep");
+  });
+});
+
+// A machine reading as Glade sends it with the `machine` capability on.
+function reading(t, fields = {}) {
+  return {
+    t, cpuCount: 10, total: 7.3, claude: 4.6, docker: 1.24, gpu: 88,
+    containers: [
+      { name: "acme-api-db-1", cpu: 78, memory: 440_401_920 },
+      { name: "acme-api-web-1", cpu: 46, memory: 188_743_680 },
+    ],
+    ...fields,
+  };
+}
+
+describe("the machine: window, pastry case and espresso machine", () => {
+  test("a snapshot's readings fill cpu_count, gpu, docker and history as fleet_dashboard.py serves them", () => {
+    const data = fed(snapshot({ machine: [reading(NOW - 2_000, { total: 5 }), reading(NOW)] })).scene(NOW);
+    assert.equal(data.cpu_count, 10);
+    assert.equal(data.gpu, 88);
+    assert.deepEqual(data.docker, [
+      { name: "acme-api-db-1", status: "", cpu: 78, memory: "420MiB" },
+      { name: "acme-api-web-1", status: "", cpu: 46, memory: "180MiB" },
+    ]);
+    assert.deepEqual(data.history, [
+      { t: NOW_S - 2, claude: 4.6, docker: 1.24, total: 5 },
+      { t: NOW_S, claude: 4.6, docker: 1.24, total: 7.3 },
+    ]);
+  });
+
+  test("app.js's window load and cakes come out as on the dashboard", () => {
+    const data = fed(snapshot({ machine: [reading(NOW)] })).scene(NOW);
+    // drawScene(): the window's load is the latest total over the core count
+    const latest = data.history[data.history.length - 1];
+    assert.equal((latest.total / data.cpu_count) * 100, 73);
+    // drawCase(): a steaming cake per busy container
+    assert.deepEqual(data.docker.map((container) => container.cpu >= 20), [true, true]);
+  });
+
+  test("each machine.reading adds to the history, and the latest sets the rest", () => {
+    const model = fed(snapshot({ machine: [] }));
+    assert.equal(model.handle({ type: "machine.reading", reading: reading(NOW - 2_000) }), true);
+    assert.equal(model.handle({ type: "machine.reading", reading: reading(NOW, { gpu: null, containers: [] }) }), true);
+    const data = model.scene(NOW);
+    assert.equal(data.history.length, 2);
+    assert.equal(data.gpu, null);
+    assert.deepEqual(data.docker, []);
+  });
+
+  test("keeps the latest 60, as Glade's snapshot does", () => {
+    const model = fed(snapshot({ machine: Array.from({ length: 70 }, (_, i) => reading(NOW + i)) }));
+    assert.equal(model.scene(NOW).history.length, MAX_MACHINE_HISTORY);
+    assert.equal(model.scene(NOW).history[0].t, (NOW + 10) / 1000);
+    for (let i = 0; i < 5; i += 1) model.handle({ type: "machine.reading", reading: reading(NOW + 100 + i) });
+    assert.equal(model.scene(NOW).history.length, MAX_MACHINE_HISTORY);
+    assert.equal(model.scene(NOW).history.at(-1).t, (NOW + 104) / 1000);
+  });
+
+  test("a new snapshot without machine readings (the capability turned off) quiets the room again", () => {
+    const model = fed(snapshot({ machine: [reading(NOW)] }));
+    model.handle({ type: "machine.reading", reading: reading(NOW + 2_000) });
+    model.handle(snapshot());
+    const data = model.scene(NOW);
+    assert.equal(data.cpu_count, 0);
+    assert.equal(data.gpu, null);
+    assert.deepEqual(data.docker, []);
+    assert.deepEqual(data.history, []);
+  });
+
+  test("drops a reading it can't use, without re-rendering", () => {
+    const model = fed(snapshot({ machine: [reading(NOW), { t: NOW }, null, "busy"] }));
+    assert.equal(model.scene(NOW).history.length, 1);
+    assert.equal(model.handle({ type: "machine.reading", reading: { total: "lots" } }), false);
+    assert.equal(model.handle({ type: "machine.reading" }), false);
+    assert.equal(model.scene(NOW).history.length, 1);
+  });
+
+  test("reads odd container fields safely", () => {
+    const data = fed(snapshot({
+      machine: [reading(NOW, { containers: [{ name: 7, cpu: "x", memory: undefined }] }), reading(NOW, { containers: "none" })],
+    })).scene(NOW);
+    assert.deepEqual(data.docker, []);
+    const odd = fed(snapshot({ machine: [reading(NOW, { containers: [{ name: 7, cpu: "x" }], claude: undefined })] }));
+    assert.deepEqual(odd.scene(NOW).docker, [{ name: "7", status: "", cpu: 0, memory: "0B" }]);
+    assert.equal(odd.scene(NOW).history[0].claude, 0);
+  });
+
+  test("formatBytes words memory as docker stats does", () => {
+    assert.equal(formatBytes(0), "0B");
+    assert.equal(formatBytes(512), "512B");
+    assert.equal(formatBytes(1536), "1.5KiB");
+    assert.equal(formatBytes(440_401_920), "420MiB");
+    assert.equal(formatBytes(1_181_116_006), "1.1GiB");
+    assert.equal(formatBytes(5 * 1024 ** 5), "5120TiB");
   });
 });
 
@@ -595,6 +692,20 @@ describe("connect", () => {
     assert.deepEqual(win.posted.at(-1), { type: "status", text: "2 cats" });
   });
 
+  test("each machine reading re-renders the room, without posting the status again", () => {
+    const win = fakeWindow();
+    const scenes = [];
+    connect(win, (data) => scenes.push(data), () => NOW);
+    win.send(snapshot({ tasks: [task("t1")], machine: [] }));
+    const statuses = win.posted.filter((m) => m.type === "status").length;
+    win.send({ type: "machine.reading", reading: reading(NOW) });
+    win.send({ type: "machine.reading", reading: reading(NOW + 2_000, { total: 9.5 }) });
+    assert.equal(scenes.length, 3);
+    assert.equal(scenes.at(-1).history.at(-1).total, 9.5);
+    assert.equal(scenes.at(-1).cpu_count, 10);
+    assert.equal(win.posted.filter((m) => m.type === "status").length, statuses);
+  });
+
   test("an event that changes nothing doesn't re-render", () => {
     const win = fakeWindow();
     const scenes = [];
@@ -612,7 +723,8 @@ describe("connect", () => {
 // ------------------------------------------------------------------ build
 describe("the plugin build", () => {
   test("its manifest passes Glade's rules", () => {
-    const { id, name, version, entry, icon } = manifest();
+    const { id, name, version, entry, icon, capabilities } = manifest();
+    assert.deepEqual(capabilities, ["machine"]);
     assert.equal(id, "nekomata");
     assert.match(id, /^[a-z0-9][a-z0-9-]{0,63}$/);
     assert.ok(name.length > 0 && name.length <= 40);

@@ -17,10 +17,17 @@ export const PLUGIN_ID = "nekomata";
 
 const read = (path) => readFileSync(join(ROOT, path), "utf8");
 
-/** The plugin's manifest.json, versioned with the extension. */
+/**
+ * The plugin's manifest.json, versioned with the extension. It asks for Glade's
+ * `machine` capability (the Mac's CPU, GPU and Docker load), which stays off
+ * until it's turned on in Glade's Settings › Plugins.
+ */
 export function manifest() {
   const { version } = JSON.parse(read("extension/package.json"));
-  return { id: PLUGIN_ID, name: "Nekomata", version, entry: "index.html", icon: "icon.svg" };
+  return {
+    id: PLUGIN_ID, name: "Nekomata", version, entry: "index.html", icon: "icon.svg",
+    capabilities: ["machine"],
+  };
 }
 
 /** The single inlined page: styles, then the Glade adapter and the scene. */

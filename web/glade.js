@@ -6,8 +6,15 @@
 // app.js's apply() takes: a task is a cat, a subagent is a kitten, a question or
 // permission card raises the cat's paw, tool calls and notes are the speech
 // bubbles, and a task that's done or deleted leaves (the adoption man carries it
-// out), as does one left idle a while, until it's busy again. Glade tells a plugin nothing about the machine, so the room's CPU, GPU
-// and Docker readings stay empty.
+// out), as does one left idle a while, until it's busy again.
+//
+// The room's CPU, GPU and Docker readings come from Glade's `machine`
+// capability, which the manifest asks for and you turn on in Glade's Settings ›
+// Plugins: then the snapshot carries the latest readings and a
+// `machine.reading` follows every ~2 s, and they fill the same cpu_count, gpu,
+// docker and history fields fleet_dashboard.py serves. With it off (or an older
+// Glade), there are none, and the room stays quiet: a cool window, an empty
+// pastry case and an idle espresso machine.
 //
 // The Glade build (`./build.sh glade`) inlines this file ahead of app.js; the
 // browser page and the VS Code extension don't include it. Tests: test/glade.test.js.
@@ -30,6 +37,64 @@
   // A modified_at so old the cat is asleep: a task waiting on you with nothing
   // left running.
   const ASLEEP = 0;
+  // The machine readings kept for the scene's history, as Glade's snapshot
+  // keeps them: about two minutes.
+  const MAX_MACHINE_HISTORY = 60;
+
+  // ------------------------------------------------------------ the machine
+  // A container's memory in bytes as `docker stats` words it ("420MiB"), for
+  // the docker list fleet_dashboard.py serves.
+  function formatBytes(bytes) {
+    const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+    let value = Number(bytes) || 0;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+    const shown = unit === 0 || value >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
+    return `${shown}${units[unit]}`;
+  }
+
+  // Whether a value looks like one of Glade's machine readings: enough of it
+  // for the scene, so a malformed one is dropped rather than drawn.
+  function isReading(reading) {
+    return !!reading && typeof reading === "object" && Number.isFinite(reading.t) &&
+      Number.isFinite(reading.total) && Number.isFinite(reading.cpuCount);
+  }
+
+  // The machine's readings, as the scene's cpu_count, gpu, docker and history.
+  function createMachine() {
+    let readings = [];   // oldest first; empty when the capability is off
+
+    function reset(list) {
+      readings = (Array.isArray(list) ? list : []).filter(isReading).slice(-MAX_MACHINE_HISTORY);
+    }
+
+    function add(reading) {
+      if (!isReading(reading)) return false;
+      readings.push(reading);
+      if (readings.length > MAX_MACHINE_HISTORY) readings.splice(0, readings.length - MAX_MACHINE_HISTORY);
+      return true;
+    }
+
+    function fields() {
+      const latest = readings[readings.length - 1];
+      if (!latest) return {cpu_count: 0, gpu: null, docker: [], history: []};
+      return {
+        cpu_count: latest.cpuCount,
+        gpu: typeof latest.gpu === "number" ? latest.gpu : null,
+        docker: (Array.isArray(latest.containers) ? latest.containers : []).map((container) => ({
+          name: String(container.name), status: "", cpu: Number(container.cpu) || 0,
+          memory: formatBytes(container.memory),
+        })),
+        // fleet_dashboard.py's history entries, with its times in seconds
+        history: readings.map((reading) => ({
+          t: reading.t / 1000, claude: Number(reading.claude) || 0,
+          docker: Number(reading.docker) || 0, total: reading.total,
+        })),
+      };
+    }
+
+    return {reset, add, fields};
+  }
 
   // ---------------------------------------------------------------- the model
   function createModel() {
@@ -38,6 +103,7 @@
     const activity = new Map();       // session id (task or subagent) → [entry]
     const questions = new Map();      // question set id → PluginQuestion
     const permissions = new Map();    // permission request id → PluginPermissionRequest
+    const machine = createMachine();  // the `machine` capability's readings
 
     function forgetTask(taskId) {
       tasks.delete(taskId);
@@ -84,8 +150,12 @@
             if (!kept.has(id)) activity.delete(id);
             else for (const entry of entries) entry.running = false;
           }
+          // The latest machine readings, with the capability on; none without.
+          machine.reset(event.machine);
           return true;
         }
+        case "machine.reading":
+          return machine.add(event.reading);
         case "task.created":
         case "task.updated":
           // A done task isn't in the snapshot, so one reopened arrives as an
@@ -265,9 +335,9 @@
             commands.push({is_wrapper: true, command: entry.detail});
       return {
         generated_at: nowSeconds, server_started: "glade",
-        // no machine readings inside Glade: a cool window, an empty pastry
-        // case and a quiet espresso machine
-        cpu_count: 0, gpu: null, docker: [], history: [],
+        // the machine's readings with the capability on; without, a cool
+        // window, an empty pastry case and a quiet espresso machine
+        ...machine.fields(),
         trees: [{rows: commands}], sessions,
       };
     }
@@ -328,7 +398,10 @@
     };
   }
 
-  const api = {API_VERSION, KITTEN_LINGER_MS, CAT_IDLE_WINDOW_MS, createModel, statusText, connect};
+  const api = {
+    API_VERSION, KITTEN_LINGER_MS, CAT_IDLE_WINDOW_MS, MAX_MACHINE_HISTORY,
+    createModel, statusText, connect, formatBytes,
+  };
   root.NekomataGlade = api;
   if (typeof module === "object" && module.exports) module.exports = api;
 })(typeof globalThis === "object" ? globalThis : this);

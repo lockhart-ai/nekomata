@@ -76,8 +76,13 @@ them to the page directly, so no server or Python is involved:
   waits on a permission card, sips **coffee** while it's paused or its background subagents
   run on, and **sleeps** while it waits on you. Tool calls and notes are the speech bubbles.
 - Marking a task done (or deleting it) sends the adoption man to carry its cat out.
-- Glade tells plugins nothing about your machine, so the window, the pastry case and the
-  espresso machine stay quiet.
+- The window, the pastry case and the espresso machine follow your Mac's load once you let
+  them: Nekomata asks for Glade's `machine` capability, which shows under it in
+  **Settings › Plugins** as **Can see your Mac's CPU, GPU and Docker load**, off until you
+  turn it on. With it on, Glade sends the CPU cores in use (all, and Claude Code's share),
+  the GPU's utilisation and each running Docker container about every 2 seconds, and the sun
+  climbs with the CPU, a cake sits in the case per container (steaming while it's busy) and
+  the espresso machine brews with the GPU, as on the dashboard. With it off, they stay quiet.
 
 To install it:
 
