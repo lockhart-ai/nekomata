@@ -7,3 +7,8 @@ extension/LICENSE
 
 # the Glade plugin build (./build.sh glade)
 dist/
+
+# Glade tasks' own folders (see CLAUDE.md), and keys that must never be committed
+/tasks/
+*.pem
+*.key
