@@ -5,6 +5,8 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  # main merges through a merge queue, which waits for this check on the queued commit
+  merge_group:
   workflow_dispatch:
 
 # needed so the tagged-release step can create a release + upload the .vsix

@@ -38,6 +38,7 @@ the same in each; only the drawing changes.
 |---|---|
 | `8bit` | The original: flat, chunky cats on big pixels. The default. |
 | `16bit` | A step finer: shaded cats with pale muzzles and happy eyes, and a little more room detail. |
+| `32bit` | The cosiest: round, outlined cats with stripes and blush, in a panelled room with a rug. |
 
 Pick one with the `nekomata.style` setting in your editor, or add `?style=16bit` to the page's
 address when you open it yourself. In Glade it is the plugin's **Art style** setting, once
@@ -127,7 +128,7 @@ Settings under `nekomata.*`:
 
 | Setting | Default | Description |
 |---|---|---|
-| `nekomata.style` | `8bit` | The art style: `8bit` or `16bit`. |
+| `nekomata.style` | `8bit` | The art style: `8bit`, `16bit` or `32bit`. |
 | `nekomata.port` | `8787` | Port the server listens on. |
 | `nekomata.pythonPath` | `python3` | Python 3 interpreter for the server. |
 | `nekomata.serverScript` | *(bundled)* | Override path to `fleet_dashboard.py`. |
