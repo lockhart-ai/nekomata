@@ -83,6 +83,19 @@ const CAT_HEAD = [
 "..OODDSSSSSSSSSDDDOO..",
 "....OOOOOOOOOOOOOO....",
 ];
+// A cat glances to one side: the features of its face sit a pixel off-centre. `shiftLeft`
+// moves the interior of a head row (columns from..to) one pixel left, filling with fur.
+function shiftLeft(row, from, to) {
+  return row.slice(0, from) + row.slice(from + 1, to + 1) + "S" + row.slice(to + 1);
+}
+// When app.js turns the cat (it looks the other way now and then), the whole cat is drawn
+// mirrored about its centre: a pen that flips every rect across `axis2 / 2`.
+function mirrored(g, axis2) {
+  return {rect(x, y, w, h, color) { g.rect(axis2 - x - w, y, w, h, color); }};
+}
+// the head with its muzzle and blush a pixel to the left, for the glance
+const HEAD_LOOK_ROWS = {10: [1, 19], 11: [1, 18], 12: [2, 18], 13: [3, 17]};
+const CAT_HEAD_LOOK = CAT_HEAD.map((row, r) => HEAD_LOOK_ROWS[r] ? shiftLeft(row, ...HEAD_LOOK_ROWS[r]) : row);
 // jolted awake: the same head with the fur standing on end
 const CAT_HEAD_SPIKY = [
 "....OO...O..O...OO....",
@@ -275,8 +288,8 @@ const CAT_TAIL_WRAP = [     // tail curled round to the front
 ".OOOOOOOOOOOOOO.",
 ];
 
-// pose: what app.js has decided the cat is doing (see 8bit.js). `turned` is not drawn: this
-// cat is lit from the window side and keeps facing the room.
+// pose: what app.js has decided the cat is doing (see 8bit.js). The cat glances left, and
+// when `turned` is drawn mirrored so it glances right.
 function drawCat(g, spot, accent, pose, frame) {
   const cx = spot.cx, py = seatY(spot);
   const pal = catPalette(accent);
@@ -296,6 +309,10 @@ function drawCat(g, spot, accent, pose, frame) {
   const {startled, waiting, raisingHand} = pose;
   const typing = pose.status === "working" && !startled && !waiting && !raisingHand;
   const x = cx + (startled ? (beat ? 1 : -1) : 0);      // a startled cat shakes
+  // everything but the laptop flips when the cat is turned; a startled cat stares straight ahead
+  const laptopPen = g;
+  if (pose.turned) g = mirrored(g, 2 * cx - 1);
+  const look = startled ? 0 : -1;
   if (startled) sprite(g, CAT_TAIL_PUFF, x + 6, py - 14, pal);
   else {
     const flick = typing ? slow : Math.floor(frame / 4) % 2;
@@ -308,11 +325,11 @@ function drawCat(g, spot, accent, pose, frame) {
     if (Math.floor(frame / 2) % 2) sprite(g, CAT_ARM_UP_B, x - 22, py - 21, pal);
     else sprite(g, CAT_ARM_UP_A, x - 20, py - 24, pal);
   }
-  sprite(g, startled ? CAT_HEAD_SPIKY : CAT_HEAD, x - 11, hy, pal);
+  sprite(g, startled ? CAT_HEAD_SPIKY : CAT_HEAD_LOOK, x - 11, hy, pal);
   const sip = waiting && pose.sipping;
   const face = FACES[startled ? "wide" : sip ? "shut" : pose.blink ? "blink" : "open"];
-  sprite(g, face.rows, x - 11, hy + face.y, pal);
-  if (pose.laptop) drawLaptop(g, cx, py, accent, pose.laptop, frame, pose.pending, pose.flash);
+  sprite(g, face.rows, x - 11 + look, hy + face.y, pal);
+  if (pose.laptop) drawLaptop(laptopPen, cx, py, accent, pose.laptop, frame, pose.pending, pose.flash);
   // paws and the mug, in front of the laptop
   if (typing) {
     sprite(g, CAT_PAW, x - 13, py - 4 - (beat ? 1 : 0), pal);
