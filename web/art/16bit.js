@@ -75,6 +75,18 @@ const CAT_HEAD = [
 ];
 // The head is drawn centred on the cat: HEAD_X is its left edge relative to the centre column.
 const HEAD_W = CAT_HEAD[0].length, HEAD_X = -(HEAD_W - 1) / 2;
+// A cat glances to one side: the features of its face sit a pixel off-centre. `shiftLeft`
+// moves the interior of a head row (columns from..to) one pixel left, filling with fur.
+function shiftLeft(row, from, to) {
+  return row.slice(0, from) + row.slice(from + 1, to + 1) + "S" + row.slice(to + 1);
+}
+// When app.js turns the cat (it looks the other way now and then), the whole cat is drawn
+// mirrored about its centre: a pen that flips every rect across `axis2 / 2`.
+function mirrored(g, axis2) {
+  return {rect(x, y, w, h, color) { g.rect(axis2 - x - w, y, w, h, color); }};
+}
+// the head with its muzzle a pixel to the left, for the glance
+const CAT_HEAD_LOOK = CAT_HEAD.map((row, r) => r >= 7 && r <= 10 ? shiftLeft(row, 1, 13) : row);
 // faces are overlays on the head; `y` is the head row they start at
 const FACES = {
   caret: {y: 6, rows: [          // the 8bit cat's happy carets
@@ -265,6 +277,10 @@ function drawCatAt(g, cx, py, accent, state, frame, opts) {
     return;
   }
   const startled = state === "startled";
+  // everything but the laptop flips when the cat is turned; a startled cat stares straight ahead
+  const laptopPen = g;
+  if (opts.turned) g = mirrored(g, 2 * cx + 1);
+  const look = startled ? 0 : -1;
   const shake = startled ? (beat ? 1 : -1) : 0;
   const bob = state === "working" && beat ? 1 : 0;
   const x = cx + shake;
@@ -276,7 +292,7 @@ function drawCatAt(g, cx, py, accent, state, frame, opts) {
   sprite(g, CAT_BODY, x - 7, py - 11, pal);
   const hy = py - 22 + bob + (startled ? -1 : 0);
   if (state === "raising") drawRaisedArm(g, x, py, hy, pal, Math.floor(frame / 2) % 2);
-  sprite(g, CAT_HEAD, x + HEAD_X, hy, pal);
+  sprite(g, startled ? CAT_HEAD : CAT_HEAD_LOOK, x + HEAD_X, hy, pal);
   if (startled) {
     // fur standing on end: single pixels poking out of the silhouette, as in 8bit
     for (const [dx, dy] of [[-8, 4], [-9, 6], [-8, 8], [8, 4], [9, 6], [8, 8], [-2, 2], [0, 1], [0, 2], [2, 2]])
@@ -286,9 +302,9 @@ function drawCatAt(g, cx, py, accent, state, frame, opts) {
   const sip = state === "waiting" && opts.sip;
   // the sip shuts its eyes, so it differs from plain waiting
   const face = startled ? "wide" : sip || opts.blink ? "closed" : "caret";
-  sprite(g, FACES[face].rows, x + HEAD_X, hy + FACES[face].y, pal);
-  sprite(g, startled ? MOUTH_OPEN : MOUTH_SMILE, x + HEAD_X, hy + 8, pal);
-  if (opts.laptop) drawLaptop(g, cx, py, accent, opts.laptop, frame, opts.pending, opts.flash);
+  sprite(g, FACES[face].rows, x + HEAD_X + look, hy + FACES[face].y, pal);
+  sprite(g, startled ? MOUTH_OPEN : MOUTH_SMILE, x + HEAD_X + look, hy + 8, pal);
+  if (opts.laptop) drawLaptop(laptopPen, cx, py, accent, opts.laptop, frame, opts.pending, opts.flash);
   // paws and props in front of the laptop
   if (!opts.laptop && state !== "waiting") {
     /* no laptop: the body bitmap already has its paws */
@@ -873,8 +889,8 @@ function drawSpotTree(g, spot, accent, frame, workingKittens) {
   drawTree(g, spot.cx, spot.baseY, spot.post, accent, frame, workingKittens);
 }
 
-// pose: what app.js has decided the cat is doing (see 8bit.js). `turned` is not drawn: this
-// cat faces the room squarely, and mirroring it would flip its lighting.
+// pose: what app.js has decided the cat is doing (see 8bit.js). The cat glances left, and
+// when `turned` is drawn mirrored so it glances right.
 function drawCat(g, spot, accent, pose, frame) {
   const seat = treeGeometry(spot.cx, spot.baseY, spot.post).seatY;
   const state = pose.status === "idle" ? "asleep" :
@@ -883,7 +899,7 @@ function drawCat(g, spot, accent, pose, frame) {
     pose.raisingHand ? "raising" :
     pose.status === "working" ? "working" : "thinking";
   drawCatAt(g, spot.cx, seat, accent, state, frame, {
-    laptop: pose.laptop, blink: pose.blink, sip: pose.sipping,
+    laptop: pose.laptop, blink: pose.blink, sip: pose.sipping, turned: pose.turned,
     pending: pose.pending, flash: pose.flash,
   });
 }
