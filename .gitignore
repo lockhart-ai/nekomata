@@ -7,3 +7,6 @@ extension/LICENSE
 
 # the Glade plugin build (./build.sh glade)
 dist/
+
+# frames written by tools/scene-shot.mjs
+/scene-shots/

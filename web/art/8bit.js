@@ -13,7 +13,12 @@
 //   kittenBubble(place), boardText(w), playTop
 //                         where the overlay's text and hover targets go, and where
 //                         kittens sit and play
-//   drawBackdrop, drawTree, drawCat, drawKittenWorking, drawKittenPlaying, drawMan
+//   drawBackdrop(g, w, frame, {cpuLoad, docker, gpu})
+//   drawTree(g, spot, accent, frame, workingKittens)
+//   drawCat(g, spot, accent, pose, frame)
+//   drawKittenWorking(g, place, accent, frame, index, yarnColor)
+//   drawKittenPlaying(g, play, accent, frame, yarnColor)
+//   drawMan(g, x, frame, carrying, heading)
 //                         the drawing itself, onto g.rect(x, y, w, h, color)
 //
 // All coordinates are in the style's own art pixels.

@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import zlib from "node:zlib";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FRAME_MS = 320;
@@ -58,6 +59,29 @@ function makeCanvas(width, height, box) {
   return canvas;
 }
 
+function encodePng(width, height, pixels, zoom) {
+  const w = width * zoom, h = height * zoom;
+  const raw = Buffer.alloc((w * 4 + 1) * h);
+  for (let y = 0; y < h; y++) {
+    const row = y * (w * 4 + 1) + 1;
+    for (let x = 0; x < w; x++) {
+      const from = (Math.floor(y / zoom) * width + Math.floor(x / zoom)) * 4;
+      raw[row + x * 4] = pixels[from]; raw[row + x * 4 + 1] = pixels[from + 1];
+      raw[row + x * 4 + 2] = pixels[from + 2]; raw[row + x * 4 + 3] = 255;
+    }
+  }
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(zlib.crc32(body));
+    return Buffer.concat([length, body, crc]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(w, 0); header.writeUInt32BE(h, 4); header[8] = 8; header[9] = 6;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header),
+    chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+
 // ------------------------------------------------------------------ the page
 function makeElement() {
   const classes = new Set();
@@ -104,7 +128,7 @@ export function loadScene({scripts, snapshot, box = {width: 1440, height: 720}, 
     console, Date: FakeDate, Math: seededMath(20261002), JSON, Promise, Map, Set, Object, Array,
     String, Number, Infinity, NaN, parseFloat, parseInt, isNaN, AbortController, URLSearchParams,
     document: {
-      hidden: false,
+      hidden: false, documentElement: {dataset: {}},
       getElementById(id) { return elements[id] || (elements[id] = makeElement()); },
       addEventListener() {},
     },
@@ -152,14 +176,9 @@ export function loadScene({scripts, snapshot, box = {width: 1440, height: 720}, 
       return createHash("sha1").update(`${canvas.width}x${canvas.height}`)
         .update(canvas.pixels).update(overlay).digest("hex").slice(0, 12);
     },
-    /** The canvas as a binary PPM image, for looking at a frame while debugging. */
-    ppm() {
-      const header = Buffer.from(`P6\n${canvas.width} ${canvas.height}\n255\n`);
-      const body = Buffer.alloc(canvas.width * canvas.height * 3);
-      for (let i = 0, j = 0; i < canvas.pixels.length; i += 4, j += 3) {
-        body[j] = canvas.pixels[i]; body[j + 1] = canvas.pixels[i + 1]; body[j + 2] = canvas.pixels[i + 2];
-      }
-      return Buffer.concat([header, body]);
+    /** The canvas as a PNG, `zoom` image pixels per canvas pixel: for looking at a frame. */
+    png(zoom = 1) {
+      return encodePng(canvas.width, canvas.height, canvas.pixels, zoom);
     },
   };
 }
@@ -247,11 +266,13 @@ export function cafeRun(t, now) {
 export async function playCafeRun(scripts, options = {}) {
   const scene = loadScene({scripts, snapshot: cafeRun, ...options});
   const hashes = [scene.hash()];
+  const shots = new Map();
   for (let frame = 1; frame <= 280; frame++) {
     if (frame === 220) await scene.resize(2000, 500);
     if (frame === 250) await scene.resize(1440, 720);
     await scene.frame();
     hashes.push(scene.hash());
+    if ((options.shots || []).includes(frame)) shots.set(frame, scene.png(options.zoom || 1));
   }
-  return {hashes, problems: scene.problems, scene};
+  return {hashes, problems: scene.problems, scene, shots};
 }

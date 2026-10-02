@@ -17,6 +17,12 @@ export const PLUGIN_ID = "nekomata";
 
 const read = (path) => readFileSync(join(ROOT, path), "utf8");
 
+/** The art styles this build carries (web/art/<id>.js), plainest first. */
+export function styles() {
+  return readdirSync(join(ROOT, "web", "art")).filter((name) => name.endsWith(".js"))
+    .map((name) => name.slice(0, -3)).sort((a, b) => parseInt(a, 10) - parseInt(b, 10) || a.localeCompare(b));
+}
+
 /**
  * The plugin's manifest.json, versioned with the extension. It asks for Glade's
  * `machine` capability (the Mac's CPU, GPU and Docker load), which stays off
@@ -27,13 +33,19 @@ export function manifest() {
   return {
     id: PLUGIN_ID, name: "Nekomata", version, entry: "index.html", icon: "icon.svg",
     capabilities: ["machine"],
+    // The art style, as a setting in Glade's Settings › Plugins (glade#435). A Glade
+    // without plugin settings ignores this and the cafe stays in its default style.
+    settings: [{
+      key: "style", label: "Art style", type: "select",
+      options: styles().map((id) => ({ value: id, label: id.replace(/bit$/, "-bit") })),
+      default: "8bit",
+    }],
   };
 }
 
 /** The scene's scripts, in the order the page inlines them: the art styles, then the scene. */
 export function sceneScripts() {
-  const art = readdirSync(join(ROOT, "web", "art")).filter((name) => name.endsWith(".js")).sort();
-  return [...art.map((name) => `web/art/${name}`), "web/app.js"];
+  return [...styles().map((id) => `web/art/${id}.js`), "web/app.js"];
 }
 
 /** The single inlined page: styles, then the Glade adapter, the art and the scene. */

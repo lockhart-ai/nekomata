@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
-import { build, manifest, page } from "../glade/build.mjs";
+import { build, manifest, page, styles } from "../glade/build.mjs";
 
 const require = createRequire(import.meta.url);
 const {
@@ -629,6 +629,30 @@ function fakeWindow() {
   };
 }
 
+describe("the art style setting", () => {
+  test("a Glade without plugin settings sends none, and the scene keeps its default", () => {
+    assert.equal("style" in fed(snapshot({ tasks: [task("t1")] })).scene(NOW), false);
+  });
+
+  test("the snapshot's style setting is handed to the scene", () => {
+    const model = fed(snapshot({ tasks: [task("t1")], settings: { style: "16bit" } }));
+    assert.equal(model.scene(NOW).style, "16bit");
+  });
+
+  test("changing it in Settings re-renders with the new style", () => {
+    const model = fed(snapshot({ settings: { style: "8bit" } }));
+    assert.equal(model.handle({ type: "settings.changed", settings: { style: "32bit" } }), true);
+    assert.equal(model.scene(NOW).style, "32bit");
+    // the same value again changes nothing
+    assert.equal(model.handle({ type: "settings.changed", settings: { style: "32bit" } }), false);
+  });
+
+  test("a fresh snapshot without the setting forgets it", () => {
+    const model = fed(snapshot({ settings: { style: "16bit" } }), snapshot());
+    assert.equal("style" in model.scene(NOW), false);
+  });
+});
+
 describe("connect", () => {
   test("posts ready, then renders and posts the count once the snapshot is in", () => {
     const win = fakeWindow();
@@ -725,6 +749,14 @@ describe("the plugin build", () => {
   test("its manifest passes Glade's rules", () => {
     const { id, name, version, entry, icon, capabilities } = manifest();
     assert.deepEqual(capabilities, ["machine"]);
+    // the art style is a select setting (glade#435), one option per style in web/art/
+    const { settings } = manifest();
+    assert.equal(settings.length, 1);
+    const [style] = settings;
+    assert.deepEqual([style.key, style.type, style.default], ["style", "select", "8bit"]);
+    assert.deepEqual(style.options.map((option) => option.value), styles());
+    assert.ok(style.options.some((option) => option.value === "8bit" && option.label === "8-bit"));
+    assert.ok(style.options.every((option) => existsSync(new URL(`../web/art/${option.value}.js`, import.meta.url))));
     assert.equal(id, "nekomata");
     assert.match(id, /^[a-z0-9][a-z0-9-]{0,63}$/);
     assert.ok(name.length > 0 && name.length <= 40);
@@ -738,7 +770,7 @@ describe("the plugin build", () => {
     assert.ok(!html.includes("/*__STYLES__*/") && !html.includes("/*__APP__*/"));
     assert.ok(html.indexOf("NekomataGlade = api") < html.indexOf("const gladeFeed"));
     // and the art styles ahead of the scene that draws with them
-    assert.ok(html.indexOf("NekomataArt[art.id] = art") < html.indexOf("const ART = "));
+    assert.ok(html.indexOf("NekomataArt[art.id] = art") < html.indexOf("let ART = "));
     assert.doesNotMatch(html, /<link\b|<script[^>]+src=|<img\b|url\(/i);
     assert.doesNotMatch(html, /https?:\/\//);
   });
