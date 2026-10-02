@@ -80,6 +80,7 @@ describe("choosing a style", () => {
     const pick = (search) => loadScene({ scripts: sceneScripts(), snapshot: cafeRun, search });
     assert.equal(pick("").evaluate("ART.id"), "8bit");
     assert.equal(pick("?style=16bit").evaluate("ART.id"), "16bit");
+    assert.equal(pick("?style=32bit").evaluate("ART.id"), "32bit");
     assert.equal(pick("?style=64bit").evaluate("ART.id"), "8bit");
     assert.equal(pick("?revive=1&style=16bit").evaluate("ART.id"), "16bit");
   });
