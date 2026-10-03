@@ -73,7 +73,7 @@ function sky(g, x, y, w, h, state, frame) {
   for (let i = 0; i < w; i++) { const hh = nearH[Math.floor((i + 9) / 2) % nearH.length]; g.rect(x + i, y + h - hh, 1, hh, near); }
 }
 
-// the window's valance on its rod, and the sill below (the hook draws both)
+// the window's valance on its rod
 function valanceWith(g, x, y, w, colors) {
   const edge = "#5a3a2c";
   g.rect(x - 2, y - 1, w + 4, 1, edge); g.rect(x - 3, y - 2, 2, 3, edge); g.rect(x + w + 1, y - 2, 2, 3, edge);
@@ -83,7 +83,6 @@ function valanceWith(g, x, y, w, colors) {
       g.rect(x + i, y + j, 1, 1, j === 0 ? colors.top : j >= scallop - 1 ? colors.trim : colors.cloth);
     g.rect(x + i, y + scallop, 1, 1, "rgba(60,30,20,0.30)");
   }
-  g.rect(x - 2, y + 31, w + 4, 3, edge); g.rect(x - 1, y + 31, w + 2, 2, "#dba673"); g.rect(x - 1, y + 32, w + 2, 1, "#b47a50");
 }
 // a deep purple valance with an orange trim
 function valance(g, x, y, w, frame) {
@@ -219,8 +218,81 @@ function decor(g, w, frame, places) {
   // a jack-o'-lantern on the window sill, and two by the bowls
   const win = places.window;
   smallPumpkin(g, win.x + win.w - 12, win.y + 25, true, frame);
-  smallPumpkin(g, w - 12, 164, false, frame);
-  smallPumpkin(g, w - 9, 170, true, frame + 1);
+  jackOLantern(g, w - 13, 172, 10, 8, "boo", frame, 1);
+  jackOLantern(g, w - 9, 178, 9, 7, "boo", frame, 2);
+}
+
+// ------------------------------------------------------------ jack-o'-lanterns
+// Carved pumpkins, drawn round from rows (still just rects), lit from inside with a gentle
+// flicker. Faces are E (the glow) on a grid centred on the pumpkin.
+const FACES = {
+  grin: [
+"...E......E...",
+"..EEE....EEE..",
+".EEEEE..EEEEE.",
+"......EE......",
+"E............E",
+"EEE.EEEEEE.EEE",
+".EEEEEEEEEEEE.",
+"...EEE..EEE...",
+  ],
+  sly: [
+"EEE....EEE",
+".EEE..EEE.",
+"....EE....",
+"E........E",
+".EE.EE.EE.",
+"..EEEEEE..",
+  ],
+  boo: [
+".EE..EE.",
+".EE..EE.",
+"...EE...",
+"..EEEE..",
+"..EEEE..",
+  ],
+};
+function jackOLantern(g, x, y, w, h, face, frame, seed) {
+  // (x, y) is the bottom-left; the pumpkin is w wide and h tall, plus its stem
+  const cx = x + w / 2, top = y - h;
+  const glow = (frame + seed) % 3 === 0 ? "#fff2a0" : (frame + seed) % 3 === 1 ? "#ffe27a" : "#ffd84a";
+  const rows = [];
+  for (let r = 0; r < h; r++) {
+    const t = (r + 0.5) / h * 2 - 1;
+    rows.push(Math.max(2, Math.round(w / 2 * Math.sqrt(1 - t * t * 0.85))));
+  }
+  rows.forEach((hw, r) => {
+    const yy = top + r, x0 = Math.round(cx - hw), x1 = Math.round(cx + hw);
+    g.rect(x0 - 1, yy, x1 - x0 + 2, 1, INK);
+    for (let i = x0; i < x1; i++) {
+      const u = (i - x0) / (x1 - x0);
+      // ridges and roundness: lit on the left, shaded on the right
+      const ridge = Math.abs(u - 0.5) > 0.12 && Math.abs(u - 0.5) < 0.18 || Math.abs(u - 0.5) > 0.36 && Math.abs(u - 0.5) < 0.42;
+      const c = ridge ? "#b0501e" : u < 0.2 ? "#f39a4a" : u > 0.78 ? "#c45a22" : "#e8782e";
+      g.rect(i, yy, 1, 1, c);
+    }
+  });
+  g.rect(Math.round(cx - rows[0]), top - 1, rows[0] * 2, 1, INK);
+  g.rect(Math.round(cx - rows[h - 1]), y, rows[h - 1] * 2, 1, INK);
+  // stem
+  g.rect(Math.round(cx) - 1, top - 3, 3, 3, INK); g.rect(Math.round(cx), top - 3, 1, 3, "#4e7a3a"); g.rect(Math.round(cx) + 1, top - 4, 2, 1, INK);
+  // the carved face, glowing; the cut's upper edge is dark, where the shell shows its depth
+  const rowsF = FACES[face], fw = rowsF[0].length, fh = rowsF.length;
+  const fx = Math.round(cx - fw / 2), fy = top + Math.round((h - fh) / 2);
+  const cut = (r, c) => r >= 0 && r < fh && rowsF[r][c] === "E";
+  for (let r = 0; r < fh; r++) for (let c = 0; c < fw; c++) if (cut(r, c)) {
+    if (!cut(r - 1, c)) g.rect(fx + c, fy + r - 1, 1, 1, "#7a2e14");
+    g.rect(fx + c, fy + r, 1, 1, cut(r + 1, c) || r === fh - 1 ? glow : "#ffb83a");
+  }
+}
+// three of them in the front corner, in place of the potted plant: (x, y) is the corner's
+// bottom-left
+function plant(g, x, y, frame) {
+  // the candlelight spills on the floor
+  g.rect(x - 4, y - 4, 40, 4, "rgba(255,170,60,0.14)"); g.rect(x - 1, y - 7, 34, 3, "rgba(255,170,60,0.10)");
+  jackOLantern(g, x - 2, y - 8, 24, 17, "grin", frame, 0);
+  jackOLantern(g, x - 4, y, 12, 9, "boo", frame, 2);
+  jackOLantern(g, x + 8, y, 16, 12, "sly", frame, 1);
 }
 
 // ------------------------------------------------------------ the cats' witch hats
@@ -248,5 +320,5 @@ function catOutfit(g, head, accent, frame) {
   sprite(g, WITCH_BRIM, head.x + 2, head.y + 3, pal);
 }
 
-art.registerTheme("halloween", {sky, valance, sunbeam, bunting, pastry, decor, catOutfit});
+art.registerTheme("halloween", {sky, valance, sunbeam, bunting, pastry, decor, plant, catOutfit});
 })(typeof globalThis === "object" ? globalThis : this);

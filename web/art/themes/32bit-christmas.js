@@ -71,7 +71,7 @@ function sky(g, x, y, w, h, state, frame) {
   }
 }
 
-// the window's valance on its rod, and the sill below (the hook draws both)
+// the window's valance on its rod
 function valanceWith(g, x, y, w, colors) {
   const edge = "#5a3a2c";
   g.rect(x - 2, y - 1, w + 4, 1, edge); g.rect(x - 3, y - 2, 2, 3, edge); g.rect(x + w + 1, y - 2, 2, 3, edge);
@@ -81,7 +81,6 @@ function valanceWith(g, x, y, w, colors) {
       g.rect(x + i, y + j, 1, 1, j === 0 ? colors.top : j >= scallop - 1 ? colors.trim : colors.cloth);
     g.rect(x + i, y + scallop, 1, 1, "rgba(60,30,20,0.30)");
   }
-  g.rect(x - 2, y + 31, w + 4, 3, edge); g.rect(x - 1, y + 31, w + 2, 2, "#dba673"); g.rect(x - 1, y + 32, w + 2, 1, "#b47a50");
 }
 // a red valance with a white fur trim and a sprig of holly in the middle
 function valance(g, x, y, w, frame) {
@@ -193,27 +192,6 @@ function pastry(g, x, y, index, busy, frame) {
 }
 
 // ------------------------------------------------------------ decorations
-// a little tree in a pot on the window sill, with a star and twinkling lights
-const XMAS_TREE = [
-".....yy.....",
-"....OyyO....",
-".....OO.....",
-"....OgGO....",
-"...OggGGO...",
-"..OgggGGGO..",
-"...OggGGO...",
-"..OgggGGGO..",
-".OggggGGGGO.",
-"..OgggGGGO..",
-".OggggGGGGO.",
-"OgggggGGGGGO",
-"OOOOOOOOOOOO",
-"...OkkkkO...",
-"...OppqqO...",
-"....OOOO....",
-];
-const TREE_LIGHTS = [[5, 5], [7, 7], [4, 8], [8, 9], [3, 10], [6, 10], [9, 11], [2, 11]];
-const PRESENT = ["OOOOOO", "ObbrbO", "OrrrrO", "ObbrbO", "OOOOOO"];
 const STOCKING = [
 "OOOOO..",
 "OwwwO..",
@@ -225,17 +203,7 @@ const STOCKING = [
 ".OOOOO.",
 ];
 function decor(g, w, frame, places) {
-  // the tree stands on the window sill, out of the way of the cats, with presents at its foot
   const win = places.window;
-  const tx = win.x + win.w - 17, ty = win.y + 31 - XMAS_TREE.length;
-  sprite(g, XMAS_TREE, tx, ty, {O: "#1e3a2a", g: "#4f9a5a", G: "#2f6a48", y: "#ffd23e",
-    k: "#6b4a3a", p: "#c96a4a", q: "#9a4a34"});
-  TREE_LIGHTS.forEach(([lx, ly], i) => {
-    const on = (i + Math.floor(frame / 2)) % 3 !== 0;
-    g.rect(tx + lx, ty + ly, 1, 1, on ? LIGHTS[i % 4] : mix(LIGHTS[i % 4], "#1e3a2a", 0.6));
-  });
-  sprite(g, PRESENT, tx - 6, win.y + 26, {O: INK, b: "#5ab8ff", r: "#ffd23e"});
-  sprite(g, PRESENT, tx + 12, win.y + 26, {O: INK, b: "#e0434f", r: "#fffaf2"});
   // snow on the window sill
   g.rect(win.x - 1, win.y + 30, win.w + 2, 1, "#fbfdff");
   for (let i = 1; i < win.w - 3; i += 9) { g.rect(win.x + i, win.y + 29, 4, 1, "#fbfdff"); g.rect(win.x + i + 1, win.y + 28, 2, 1, "#fbfdff"); }
@@ -244,6 +212,76 @@ function decor(g, w, frame, places) {
   const e = places.espresso;
   sprite(g, STOCKING, e.x + 6, e.y + 31, {O: INK, w: "#fffaf2", r: "#d9343f"});
   sprite(g, STOCKING, e.x + 16, e.y + 31, {O: INK, w: "#fffaf2", r: "#3e8f4a"});
+}
+
+// ------------------------------------------------------------ the Christmas tree
+// It stands in the front corner in place of the potted plant: three tiers of branches lit
+// from the window side, tinsel, baubles, twinkling lights and a star, in a red pot, with
+// presents piled round its foot. (x, y) is the pot's bottom-left.
+const STAR = [
+"...O...",
+"..OyO..",
+"OOOyOOO",
+"OyyYyyO",
+".OyyyO.",
+"OyOOOyO",
+"OO...OO",
+];
+const NEEDLES = {O: "#1e3a2a", l: "#62b05c", m: "#3e8f4a", d: "#2c6a46"};
+const BAUBLES = [[-1, 4, "#e0434f"], [-5, 12, "#5ab8ff"], [4, 10, "#f2c94c"], [-8, 22, "#f2c94c"],
+  [2, 19, "#e0434f"], [8, 24, "#b48ae0"], [-3, 28, "#f49ab0"], [-11, 31, "#e0434f"], [6, 31, "#5ab8ff"]];
+const TWINKLES = [[2, 6], [-3, 9], [-2, 16], [6, 15], [-6, 19], [5, 21], [0, 25], [-7, 27], [10, 29], [-1, 32], [3, 28]];
+function present(g, x, y, w, h, box, ribbon) {
+  g.rect(x, y, w, h, INK);
+  g.rect(x + 1, y + 1, w - 2, h - 2, box);
+  g.rect(x + 1, y + 1, w - 2, 1, mix(box, "#ffffff", 0.35));
+  g.rect(x + 1, y + h - 2, w - 2, 1, mix(box, "#2a1a20", 0.25));
+  const mx = x + Math.floor(w / 2);
+  g.rect(mx, y + 1, 1, h - 2, ribbon); g.rect(x + 1, y + 2, w - 2, 1, ribbon);
+  // a bow on top
+  g.rect(mx - 2, y - 2, 2, 2, ribbon); g.rect(mx + 1, y - 2, 2, 2, ribbon); g.rect(mx, y - 1, 1, 1, ribbon);
+  g.rect(mx - 2, y - 3, 2, 1, INK); g.rect(mx + 1, y - 3, 2, 1, INK);
+}
+function plant(g, x, y, frame) {
+  const cx = x + 11, top = y - 46;
+  // a soft glow on the floor under it
+  g.rect(cx - 16, y - 3, 34, 3, "rgba(255,214,120,0.12)");
+  // branches: three tiers, the lowest drawn first so each tier's drooping edge hangs over the next
+  for (const [ty, h, a, b] of [[top + 22, 13, 6, 13], [top + 14, 11, 4, 10], [top + 7, 10, 2, 7]]) {
+    for (let r = 0; r < h; r++) {
+      const hw = Math.round(a + (b - a) * r / (h - 1)), yy = ty + r;
+      g.rect(cx - hw - 1, yy, hw * 2 + 3, 1, NEEDLES.O);
+      for (let i = -hw; i <= hw; i++) {
+        const c = i < -hw / 3 ? NEEDLES.l : i > hw / 3 ? NEEDLES.d : NEEDLES.m;
+        g.rect(cx + i, yy, 1, 1, r === h - 1 && (i + hw) % 3 === 2 ? NEEDLES.O : c);
+      }
+    }
+    g.rect(cx - b - 1, ty + h, b * 2 + 3, 1, "rgba(30,58,42,0.35)");
+  }
+  // a strand of tinsel looping down each tier
+  for (const [ty, w0, w1] of [[top + 11, -5, 5], [top + 19, -8, 8], [top + 28, -11, 11]])
+    for (let i = w0; i <= w1; i += 2) g.rect(cx + i, ty + Math.round((i - w0) / 4), 1, 1, "#f2d26a");
+  // baubles, each with a glint
+  for (const [dx, dy, c] of BAUBLES) {
+    g.rect(cx + dx, top + dy, 2, 2, c); g.rect(cx + dx, top + dy, 1, 1, mix(c, "#ffffff", 0.6));
+    g.rect(cx + dx + 1, top + dy + 1, 1, 1, mix(c, "#2a1a20", 0.3));
+  }
+  // fairy lights, twinkling in turn
+  TWINKLES.forEach(([dx, dy], i) => {
+    const on = (i + Math.floor(frame / 2)) % 3 !== 0;
+    g.rect(cx + dx, top + dy, 1, 1, on ? LIGHTS[i % 4] : mix(LIGHTS[i % 4], "#1e3a2a", 0.55));
+  });
+  // the star, catching the light now and then
+  sprite(g, STAR, cx - 3, top, {O: "#a8741e", y: "#ffd23e", Y: frame % 6 < 2 ? "#ffffff" : "#fff3a8"});
+  // trunk and a red pot with a gold band
+  g.rect(cx - 2, top + 35, 4, 3, "#6b4a3a");
+  g.rect(cx - 6, top + 37, 12, 9, INK);
+  g.rect(cx - 5, top + 38, 10, 7, "#d9343f"); g.rect(cx - 5, top + 38, 3, 7, "#f05a62");
+  g.rect(cx + 2, top + 38, 3, 7, "#a8242f"); g.rect(cx - 5, top + 40, 10, 2, "#f2c94c");
+  // presents piled round its foot
+  present(g, x - 4, y - 9, 11, 9, "#e0434f", "#f2c94c");
+  present(g, cx + 6, y - 7, 9, 7, "#5ab8ff", "#fffaf2");
+  present(g, cx - 4, y - 5, 8, 5, "#4f9a5a", "#e0434f");
 }
 
 // ------------------------------------------------------------ the cats' Santa hats
@@ -281,5 +319,5 @@ function front(g, w, h, frame) {
   }
 }
 
-art.registerTheme("christmas", {sky, valance, bunting, pastry, decor, catOutfit, front});
+art.registerTheme("christmas", {sky, valance, bunting, pastry, decor, plant, catOutfit, front});
 })(typeof globalThis === "object" ? globalThis : this);
