@@ -7,8 +7,11 @@
   body { background: #2b211d; height: 100vh; overflow: hidden;
     font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
   #stage { position: fixed; inset: 0; }
-  #scene { position: absolute; inset: 0; width: 100%; height: 100%;
+  #scene, #actors { position: absolute; inset: 0; width: 100%; height: 100%;
     image-rendering: pixelated; object-fit: contain; }
+  /* the trees, cats and kittens: in front of the chalkboard's text, behind name labels
+     and speech bubbles */
+  #actors { z-index: 2; pointer-events: none; }
   #overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
   #corner { position: fixed; left: 50%; transform: translateX(-50%);
     bottom: 10px; z-index: 5; white-space: nowrap;
