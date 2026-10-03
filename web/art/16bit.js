@@ -389,6 +389,82 @@ function drawKittenPlay(g, cx, by, accent, frame, flip) {
   if (f) { g.rect(flip ? hx - 2 : hx + 9, by - 2, 2, 2, pal.B); g.rect(hx + (flip ? 3 : 4), by - 1, 2, 1, pal.B); }
 }
 
+// Errands. Head down in a bowl: the same crouch as the pounce, the face lowered into the
+// bowl with its eyes shut, lapping (a one-pixel dip). Drawn facing right from (cx, by).
+const KIT_HEAD_DOWN = [
+"SS.....SS",
+"SPS...SPS",
+"SSSSSSSSS",
+"SSSSSSSSS",
+"SKKSSSKKS",
+"SSSBPBSSS",
+".SSBBBSS.",
+];
+function drawKittenAtBowl(g, cx, by, accent, frame, flip) {
+  const pal = catPalette(accent), f = frame % 2;
+  const at = (x, w) => flip ? 2 * cx - x - w + 1 : x;        // mirror about cx
+  sprite(g, KIT_SIDE_B, at(cx - 8, 10), by - 7, pal, flip);
+  sprite(g, KIT_HEAD_DOWN, at(cx + 1, 9), by - 10 + f, pal, flip);
+}
+// Swatting at the plant: standing, head up, one front paw raised and batting at the leaves
+// (wound up, then swiped down and forward). Drawn facing right from (cx, by).
+const KIT_SWAT = [
+[ // wound up beside the face
+"..BBB..",
+"..BPB..",
+"..SS...",
+"..SS...",
+".SS....",
+".SS....",
+"SS.....",
+"SS.....",
+  ],
+[ // swiped down and forward into the leaves
+".......",
+".......",
+"....BBB",
+"...SBPB",
+"..SS...",
+".SS....",
+"SS.....",
+"SS.....",
+  ],
+];
+function drawKittenSwatting(g, cx, by, accent, frame, flip) {
+  const pal = catPalette(accent), f = frame % 2;
+  const at = (x, w) => flip ? 2 * cx - x - w + 1 : x;        // mirror about cx
+  sprite(g, KIT_SIDE_A, at(cx - 8, 10), by - 7, pal, flip);
+  sprite(g, KIT_HEAD, at(cx - 1, 9), by - 11, pal, flip);
+  sprite(g, KIT_SWAT[f], at(cx + 7, 7), by - 13, pal, flip);
+  if (f) g.rect(at(cx + 15, 2), by - 13, 2, 1, "#63b257");     // a leaf knocked loose
+}
+// Napping in the sunbeam: curled up, eyes shut, tail wrapped round the front; the flank
+// rises and falls.
+const KIT_NAP = [
+  [
+"SS.....SS.......",
+"SPS...SPS.SSSS..",
+"SSSSSSSSSSSSSSS.",
+"SSSSSSSSSDSSSSSD",
+"SKKSSSKKSDSSSSSD",
+"SSSBPBSSSDSSSSDD",
+".BBMBMBBDSSDSSD.",
+"..DDDDDDDDDDDD..",
+  ],
+  [
+"SS.....SS.SSSS..",
+"SPS...SPSSSSSSS.",
+"SSSSSSSSSSSSSSSS",
+"SSSSSSSSSDSSSSSD",
+"SKKSSSKKSDSSSSSD",
+"SSSBPBSSSDSSSSDD",
+".BBMBMBBDSSDSSD.",
+"..DDDDDDDDDDDD..",
+  ],
+];
+function drawKittenNapping(g, cx, by, accent, frame) {
+  sprite(g, KIT_NAP[Math.floor(frame / 3) % 2], cx - 8, by - 8, catPalette(accent));
+}
 
 // ============================================================ THE ADOPTION MAN
 // H skin  h shine  N skin shade  G glasses  w lens  K eye/mouth
@@ -522,15 +598,20 @@ function drawMiniYarn(g, x, y, color, f) {
   for (const [dx, dy] of (f ? [[4, 3], [5, 3]] : [[-1, 3], [-2, 3]])) g.rect(x + dx, y + dy, 1, 1, pal.b);
   sprite(g, f ? YARN_MINI_B : YARN_MINI_A, x, y, pal);
 }
+const BOWLS = {water: ["#6db5e8", "#a6d6f5"], food: ["#b9744c", "#d0916a"]};
+// one bowl, (x, y) the top-left of its rim; `frontOnly` redraws just the rim and body, over
+// a kitten whose face is in the bowl
+function drawBowl(g, x, y, kind, frontOnly) {
+  g.rect(x, y, 10, 2, "#fffaf0"); g.rect(x + 1, y + 2, 8, 2, "#fffaf0");
+  g.rect(x + 8, y + 1, 2, 1, "#dfd3c0"); g.rect(x + 7, y + 2, 2, 2, "#dfd3c0");
+  if (frontOnly) return;
+  const [fill, fillL] = BOWLS[kind];
+  g.rect(x + 1, y - 1, 8, 1, fill); g.rect(x + 2, y - 1, 3, 1, fillL);
+}
 function drawBowls(g, x, y) {            // (x, y): top-left of the water bowl's rim
   g.rect(x - 1, y + 4, 24, 1, "#b98a66");                                        // mat
-  const bowl = (bx, fill, fillL) => {
-    g.rect(bx, y, 10, 2, "#fffaf0"); g.rect(bx + 1, y + 2, 8, 2, "#fffaf0");
-    g.rect(bx + 8, y + 1, 2, 1, "#dfd3c0"); g.rect(bx + 7, y + 2, 2, 2, "#dfd3c0");
-    g.rect(bx + 1, y - 1, 8, 2, fill); g.rect(bx + 2, y - 1, 3, 1, fillL);
-  };
-  bowl(x, "#6db5e8", "#a6d6f5");
-  bowl(x + 12, "#b9744c", "#d0916a");
+  drawBowl(g, x, y, "water");
+  drawBowl(g, x + 12, y, "food");
 }
 
 function drawPlant(g, x, y) {            // (x, y) = bottom-left of the pot
@@ -880,7 +961,7 @@ function drawBackdrop(g, w, frame, readings) {
   drawHangingPlant(g, w - 11);
   drawSunbeam(g, WINDOW_X + shift, sun);
   drawPlant(g, 5, WALL_H + 11);
-  drawBowls(g, w - 34, 136);
+  drawBowls(g, bowlsX(w), BOWL_Y);
   drawYarn(g, 94, 135, "#e66767");
   drawYarn(g, w - 83, 129, "#9085e9");
 }
@@ -910,12 +991,42 @@ function drawKittenWorking(g, place, accent, frame, index, yarnColor) {
 }
 
 // A finished kitten roams the floor after its ball: play = {x, y, ballX, ballY}, in art
-// pixels but fractional, so both are rounded onto the grid. The kitten faces the ball.
+// pixels but fractional, so both are rounded onto the grid. The kitten faces the ball, or,
+// on an errand (play.errand, see attractions), the way it is walking, then does the errand.
 function drawKittenPlaying(g, play, accent, frame, yarnColor) {
   const x = Math.round(play.x), y = Math.round(play.y);
   const ballX = Math.round(play.ballX), ballY = Math.round(play.ballY);
   drawMiniYarn(g, ballX - 2, ballY - 2, yarnColor, frame % 2);
-  drawKittenPlay(g, x, y, accent, frame, ballX < x);
+  const errand = play.errand;
+  if (!errand) { drawKittenPlay(g, x, y, accent, frame, ballX < x); return; }
+  if (errand.phase !== "do") { drawKittenPlay(g, x, y, accent, frame, Math.round(errand.x) < x); return; }
+  const flip = errand.facing < 0;
+  if (errand.kind === "sun") drawKittenNapping(g, x, y, accent, frame);
+  else if (errand.kind === "plant") drawKittenSwatting(g, x, y, accent, frame, flip);
+  else {
+    // its face goes in behind the bowl's front; a drop or a crumb hops out now and then
+    drawKittenAtBowl(g, x, y, accent, frame, flip);
+    const bowlX = flip ? x - 10 : x + 1;
+    drawBowl(g, bowlX, BOWL_Y, errand.kind, true);
+    if (frame % 4 === 1) g.rect(flip ? bowlX - 1 : bowlX + 10, BOWL_Y - 2, 1, 1, BOWLS[errand.kind][errand.kind === "water" ? 1 : 0]);
+  }
+}
+
+// ------------------------------------------------------------ errands
+// where kittens go: a bowl each to drink and eat at (water from the left, food from the
+// right), the potted plant's right side to swat at it, and the warm patch of the sunbeam
+const BOWL_Y = 136;
+const bowlsX = (w) => w - 34;            // the water bowl's left edge; the food bowl is 12 on
+function attractions(w, readings) {
+  const list = [
+    {kind: "water", x: bowlsX(w) - 1, y: BOWL_Y + 4, facing: 1},
+    {kind: "food", x: bowlsX(w) + 22, y: BOWL_Y + 4, facing: -1},
+    {kind: "plant", x: 20, y: WALL_H + 12, facing: -1},
+  ];
+  // the middle of the beam drawSunbeam lays on the floor (its rows run WALL_H + 4 to + 35)
+  const x = WINDOW_X + wallShift(w);
+  if (windowState(readings.cpuLoad) > 0) list.push({kind: "sun", area: {x0: x + 30, y0: WALL_H + 20, x1: x + 55, y1: WALL_H + 33}});
+  return list;
 }
 
 // The man walks along the front of the floor; x moves 8 art pixels a frame.
@@ -927,7 +1038,7 @@ const art = {
   id: "16bit", px: PX, width: W, height: H,
   // kittens play on the floor below this line
   playTop: 54,
-  spots, postFor, catAnchors, kittenPlace, kittenHover, kittenBubble, boardText,
+  spots, postFor, catAnchors, kittenPlace, kittenHover, kittenBubble, boardText, attractions,
   drawBackdrop, drawTree: drawSpotTree, drawCat, drawKittenWorking, drawKittenPlaying, drawMan,
 };
 root.NekomataArt = root.NekomataArt || {};
