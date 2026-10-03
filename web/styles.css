@@ -58,9 +58,10 @@
   html[data-style="16bit"] .board-text { color: #f4efe0; }
   html[data-style="16bit"] .board-text .board-title { color: #f7e3a8; }
   /* 32bit: chalk on a green slate, a butter-yellow title over a pink chalk rule */
-  html[data-style="32bit"] .board-text { color: #f4efe0; }
-  html[data-style="32bit"] .board-text .board-title { color: #f7d98a;
-    border-bottom: 2px dashed #f49ab0; align-self: flex-start; max-width: 100%; margin-bottom: 2px; }
+  /* its slate is shorter than 8bit's, so the lines sit closer and the title is smaller */
+  html[data-style="32bit"] .board-text { color: #f4efe0; line-height: 1.2; }
+  html[data-style="32bit"] .board-text .board-title { color: #f7d98a; font-size: 0.8em;
+    border-bottom: 1px dashed #f49ab0; align-self: flex-start; max-width: 100%; margin-bottom: 1px; }
   .rack-label { position: absolute; z-index: 1; transform: translate(-50%, 0); text-align: center;
     font-size: 10.5px; color: #7a5a48; font-variant-numeric: tabular-nums;
     white-space: nowrap; }
