@@ -30,10 +30,20 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g,
 // ------------------------------------------------------------ scene state
 const canvas = document.getElementById("scene");
 const context = canvas.getContext("2d");
-// what a style draws onto
+// The scene is two layers: the room on the bottom canvas, and everything in it (trees,
+// cats, kittens, the adoption man) on a second one above the overlay's chalkboard text, so
+// a cat in front of the board covers the board's writing too.
+const actorsCanvas = document.getElementById("actors");
+const actorsContext = actorsCanvas.getContext("2d");
+// what a style draws onto: the layer drawScene has picked
 const pen = {
-  rect(x, y, w, h, color) { context.fillStyle = color; context.fillRect(x, y, w, h); },
+  layer: context,
+  rect(x, y, w, h, color) { this.layer.fillStyle = color; this.layer.fillRect(x, y, w, h); },
 };
+
+function sizeCanvases(width, height) {
+  for (const layer of [canvas, actorsCanvas]) { layer.width = width; layer.height = height; }
+}
 
 function fitSceneToViewport() {
   // Widen the scene to the viewport's aspect ratio; the style lays its room
@@ -44,7 +54,7 @@ function fitSceneToViewport() {
     Math.max(SCENE_W, Math.round(sceneH * box.width / box.height)));
   if (wanted === sceneW) return false;
   sceneW = wanted;
-  canvas.width = sceneW;
+  sizeCanvases(sceneW, sceneH);
   // the room's bowls, plant and sunbeam moved with the width: errands start over
   for (const play of kittenPlay.values()) play.errand = null;
   return true;
@@ -75,8 +85,7 @@ function useStyle(id) {
   SCENE_W_MAX = Math.round(2400 / UNIT);
   sceneW = SCENE_W;
   sceneH = ART.height;
-  canvas.width = sceneW;
-  canvas.height = sceneH;
+  sizeCanvases(sceneW, sceneH);
   document.documentElement.dataset.style = ART.id;
   // Positions are in the old style's pixels: start the floor over, with no
   // ceremonies for cats that were already here.
@@ -344,6 +353,8 @@ function workingKittensOf(data, sessionId) {
 
 function drawScene() {
   context.clearRect(0, 0, sceneW, sceneH);
+  actorsContext.clearRect(0, 0, sceneW, sceneH);
+  pen.layer = context;
   const data = latestData;
   const latest = data && data.history.length
     ? data.history[data.history.length - 1] : null;
@@ -351,6 +362,7 @@ function drawScene() {
     ? (latest.total / data.cpu_count) * 100 : 0;
   const readings = {cpuLoad, docker: data ? data.docker : [], gpu: data ? data.gpu : null};
   ART.drawBackdrop(pen, sceneW, frame, readings);
+  pen.layer = actorsContext;                    // the rest stands in front of the board's text
   const now = data ? data.generated_at : 0;
   const bySlot = new Map();
   if (data) for (const session of data.sessions) {
@@ -503,9 +515,6 @@ function renderOverlay(data) {
     `max-width:${Math.max(80, Math.min(170, bandScreen))}px;`;
   const nameFont = `font-size:${Math.max(8, Math.min(12, 11 * textScale)).toFixed(1)}px;`;
   const pieces = [];
-  // where cats and kittens stand, on screen: the chalkboard's text is cut away there, so a
-  // cat on a tall tree is in front of the board rather than written over
-  const inFront = [];
   for (const session of data.sessions) {
     const slot = spotBySession.get(session.id);
     if (slot === undefined || hiddenCatIds.has(session.id)) continue;
@@ -524,8 +533,6 @@ function renderOverlay(data) {
     const catHover = hoverData(session, now);
     const catBox = scenePosition(anchors.hover.x0, anchors.hover.y0);
     const catBoxEnd = scenePosition(anchors.hover.x1, anchors.hover.y1);
-    const footprint = anchors.footprint || anchors.hover;
-    inFront.push([scenePosition(footprint.x0, footprint.y0), scenePosition(footprint.x1, footprint.y1)]);
     pieces.push(`<div class="hover-target"` +
       ` style="left:${catBox.left}px;top:${catBox.top}px;` +
       `width:${catBoxEnd.left - catBox.left}px;height:${catBoxEnd.top - catBox.top}px"` +
@@ -547,7 +554,6 @@ function renderOverlay(data) {
       const kittenHover = hoverData(kitten, now);
       const hoverBox = scenePosition(kittenBox.x0, kittenBox.y0);
       const hoverBoxEnd = scenePosition(kittenBox.x1, kittenBox.y1);
-      inFront.push([hoverBox, hoverBoxEnd]);
       pieces.push(`<div class="hover-target"` +
         ` style="left:${hoverBox.left}px;top:${hoverBox.top}px;` +
         `width:${hoverBoxEnd.left - hoverBox.left}px;` +
@@ -577,11 +583,9 @@ function renderOverlay(data) {
   const boardBottomRight = scenePosition(board.x1, board.y1);
   const boardWidth = boardBottomRight.left - boardTopLeft.left;
   const fontPx = Math.max(8, Math.round(boardWidth / 34));
-  const boardHeight = boardBottomRight.top - boardTopLeft.top;
   pieces.push(`<div class="board-text" style="left:${boardTopLeft.left}px;` +
     `top:${boardTopLeft.top}px;width:${boardWidth}px;` +
-    `height:${boardHeight}px;font-size:${fontPx}px;` +
-    boardCutouts(inFront, boardTopLeft, boardWidth, boardHeight) + `">` +
+    `height:${boardBottomRight.top - boardTopLeft.top}px;font-size:${fontPx}px">` +
     `<div class="board-title">TODAY'S SPECIALS (${commands.length})</div>` +
     commands.slice(0, 4).map((c) => `<div>▸ ${escapeHtml(c)}</div>`).join("") +
     `</div>`);
@@ -591,19 +595,6 @@ function renderOverlay(data) {
   overlay.innerHTML = pieces.join("");
   clampBubblesToView();
   resolveBubbleCollisions();
-}
-
-// A clip-path for the chalkboard's text with a hole wherever a cat or kitten stands over it
-// (screen rectangles as [topLeft, bottomRight]); nothing when none does.
-function boardCutouts(rects, origin, width, height) {
-  const holes = rects
-    .map(([from, to]) => [from.left - origin.left, from.top - origin.top,
-                          to.left - origin.left, to.top - origin.top])
-    .filter(([x0, y0, x1, y1]) => x1 > 0 && y1 > 0 && x0 < width && y0 < height)
-    .map(([x0, y0, x1, y1]) => `M${x0.toFixed(1)} ${y0.toFixed(1)}H${x1.toFixed(1)}` +
-      `V${y1.toFixed(1)}H${x0.toFixed(1)}Z`);
-  if (!holes.length) return "";
-  return `clip-path:path(evenodd,'M0 0H${width.toFixed(1)}V${height.toFixed(1)}H0Z${holes.join("")}');`;
 }
 
 function clampBubblesToView() {

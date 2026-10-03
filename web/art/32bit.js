@@ -1220,8 +1220,6 @@ function catAnchors(spot, asleep) {
     bubbleY: seat - (asleep ? 17 : 29) - 3,
     nameX: spot.cx, nameY: spot.y + 8,
     hover: {x0: spot.cx - 13, y0: seat - 29, x1: spot.cx + 13, y1: seat + 2},
-    // the whole cat, ears, tail and anything a theme puts on its head included
-    footprint: {x0: spot.cx - 14, y0: seat - 44, x1: spot.cx + 16, y1: seat + 2},
   };
 }
 
