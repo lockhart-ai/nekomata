@@ -409,6 +409,63 @@ const KIT_RUMP_B = [
 ];
 const KIT_PAWS = ["OLLO.OLLO", ".OO...OO."];
 const KIT_PAW = [".OO.", "OLLO", ".OO."];
+// walking, seen from the side behind its head (which faces the room), tail up; facing right
+const KIT_WALK_A = [
+".OO.........",
+"OSSO........",
+"OSO.........",
+"OSO.OOOOOO..",
+".OSOSSSSSSO.",
+"..OSSSSSSSSO",
+"..OSSSSSSSSO",
+"..ODSSSSSDDO",
+"..OSOOOOOSO.",
+"..OLO...OLO.",
+"..OOO...OOO.",
+];
+const KIT_WALK_B = [
+"...OO.......",
+"..OSSO......",
+"..OSO.......",
+".OSO.OOOOO..",
+".OSOSSSSSSO.",
+"..OSSSSSSSSO",
+"..OSSSSSSSSO",
+"..ODSSSSSDDO",
+"..OOSOOOSOO.",
+"...OLO.OLO..",
+"...OOO.OOO..",
+];
+// eyes shut: lapping at a bowl, or asleep
+const KIT_HEAD_SHUT = KIT_HEAD.map((row, r) =>
+  r === 5 ? "OSKSKSSSKSKDO" : r === 6 ? "OSSKSBPBSKSDO" : row);
+// napping: a little breathing mound behind the head, tail curled round the front
+const KIT_MOUND_A = [
+"..OOOOOO....",
+".OSSTSTSOO..",
+"OSSSTSTSSSO.",
+"OSSSSSSSSSDO",
+"OSSSSSSSSDDO",
+"OSSSSSSSDDDO",
+".ODDDDDDDDO.",
+"..OOOOOOOO..",
+];
+const KIT_MOUND_B = [       // breathing in
+"..OOOOOO....",
+".OSSTSTSOO..",
+"OSSSTSTSSSO.",
+"OSSSSSSSSSDO",
+"OSSSSSSSSSDO",
+"OSSSSSSSSDDO",
+"OSSSSSSSDDDO",
+".ODDDDDDDDO.",
+"..OOOOOOOO..",
+];
+const KIT_TAIL_WRAP = [
+".OOOOOOOOO.",
+"ODSSSSSSTTO",
+".OOOOOOOOO.",
+];
 
 // working: sits beside the trunk batting a little yarn ball. `side` is which side of the
 // trunk it sits on (-1 left, +1 right); the ball is on its outer side, the tail on the inner.
@@ -427,15 +484,23 @@ function drawKittenWorking(g, place, accent, frame, index, yarnColor) {
   drawKittenAt(g, place.centerX, place.bottom, accent, frame + index, place.side, yarnColor);
 }
 // A finished kitten roams the floor after its ball: play = {x, y, ballX, ballY}. It is drawn
-// in a play bow facing the ball, its nose at (x, y), and bats when the ball is in reach.
+// in a play bow facing the ball, its nose at (x, y), and bats when the ball is in reach. On an
+// errand (see attractions) it walks there, then drinks, eats, swats or naps at (x, y).
 function drawKittenPlaying(g, play, accent, frame, yarnColor) {
   const pal = catPalette(accent);
   const f = frame % 2;
   const ballX = Math.round(play.ballX), ballY = Math.round(play.ballY);
-  const flip = ballX < Math.round(play.x);
-  const cx = Math.round(play.x) + (flip ? 6 : -6), by = Math.round(play.y) + 2;
-  const reach = Math.hypot(play.ballX - play.x, play.ballY - play.y) < 11;
   drawMiniYarn(g, ballX - 3, ballY - 3, yarnColor, f);
+  const x = Math.round(play.x), y = Math.round(play.y);
+  const errand = play.errand;
+  if (errand && errand.phase === "go")
+    return drawKittenWalk(g, x, y, pal, f, errand.x < play.x ? -1 : 1);
+  if (errand && errand.kind === "sun") return drawKittenNap(g, x, y, pal, Math.floor(frame / 3) % 2);
+  if (errand && errand.kind === "plant") return drawKittenSwat(g, x, y, pal, f, errand.facing);
+  if (errand) return drawKittenAtBowl(g, errand.kind, x, y, pal, f);
+  const flip = ballX < x;
+  const cx = x + (flip ? 6 : -6), by = y + 2;
+  const reach = Math.hypot(play.ballX - play.x, play.ballY - play.y) < 11;
   sprite(g, f ? KIT_RUMP_B : KIT_RUMP_A, flip ? cx + 2 : cx - 12, by - 14, pal, flip);
   const hx = flip ? cx - 9 : cx - 4;
   sprite(g, KIT_HEAD, hx, by - 10 - (f ? 1 : 0), pal);
@@ -444,6 +509,44 @@ function drawKittenPlaying(g, play, accent, frame, yarnColor) {
     sprite(g, KIT_PAW, hx + 2, by - 3, pal);
   } else {
     sprite(g, KIT_PAWS, hx + 2, by - 2, pal);
+  }
+}
+
+// trotting along, feet at (x, y), head bobbing with the step
+function drawKittenWalk(g, x, y, pal, f, facing) {
+  sprite(g, f ? KIT_WALK_B : KIT_WALK_A, facing > 0 ? x - 9 : x - 3, y - 10, pal, facing < 0);
+  sprite(g, KIT_HEAD, facing > 0 ? x - 4 : x - 9, y - 11 + f, pal);
+}
+
+// curled up in the sun, breathing: head down on its paws, tail round the front
+function drawKittenNap(g, x, y, pal, breath) {
+  const mound = breath ? KIT_MOUND_B : KIT_MOUND_A;
+  sprite(g, mound, x - 2, y - mound.length, pal);
+  sprite(g, KIT_TAIL_WRAP, x - 3, y - 3, pal);
+  sprite(g, KIT_HEAD_SHUT, x - 11, y - 10 + (breath ? 0 : 1), pal);
+}
+
+// sitting by the plant, batting at its leaves: paw wound up, then out into the leaves
+function drawKittenSwat(g, x, y, pal, f, facing) {
+  const out = facing < 0 ? -1 : 1;
+  sprite(g, KIT_SIT_BODY, out < 0 ? x - 5 : x - 9, y - 5, pal, out > 0);
+  sprite(g, KIT_HEAD, x - 6, y - 14 + (f ? 0 : 1), pal);
+  if (f) sprite(g, KIT_PAW, out < 0 ? x - 11 : x + 8, y - 12, pal);
+  else sprite(g, KIT_PAW, out < 0 ? x - 9 : x + 6, y - 9, pal);
+}
+
+// sitting up behind its bowl, bobbing its head down into it and back up; the bowl's front
+// is drawn again over its paws and, on the dip, its muzzle. The tail is on the outer side,
+// away from the other bowl. A drop or a crumb flies as the head comes up.
+function drawKittenAtBowl(g, kind, x, by, pal, f) {
+  const bx = x - 6, outer = kind === "water" ? -1 : 1;
+  sprite(g, KIT_SIT_BODY, outer < 0 ? x - 9 : x - 5, by - 5, pal, outer < 0);
+  if (f) sprite(g, KIT_HEAD_SHUT, x - 6, by - 8, pal);
+  else sprite(g, KIT_HEAD, x - 6, by - 14, pal);
+  sprite(g, BOWL.slice(2), bx, BOWLS_Y + 2, BOWL_PAL[kind]);
+  if (!f) {
+    const bit = kind === "water" ? "#8fd0f5" : "#9a6240";
+    g.rect(bx - 1, by - 9, 1, 1, bit); g.rect(bx + 13, by - 11, 1, 1, bit);
   }
 }
 
@@ -640,15 +743,17 @@ const BOWL = [
 "..OaaaaabbO..",
 "...OOOOOOO...",
 ];
+const BOWL_PAL = {
+  water: {O: INK, r: "#e8f6ff", a: "#6aa9e0", b: "#4a84c0", i: "#e8f6ff"},
+  food: {O: INK, r: "#fff1dc", a: "#f2b05e", b: "#d48a3c", i: "#fff1dc"},
+};
 function drawBowls(g, x, y) {
   // a placemat with a water bowl and a food bowl
   g.rect(x - 2, y + 3, 34, 4, "#8a5a66"); g.rect(x - 1, y + 3, 32, 3, "#e9a3ad");
   g.rect(x - 1, y + 3, 32, 1, "#f6c3c8");
-  const water = {O: INK, r: "#e8f6ff", a: "#6aa9e0", b: "#4a84c0", i: "#e8f6ff"};
-  sprite(g, BOWL, x, y, water);
+  sprite(g, BOWL, x, y, BOWL_PAL.water);
   g.rect(x + 2, y + 1, 9, 1, "#8fd0f5"); g.rect(x + 3, y + 1, 2, 1, "#ffffff");
-  const food = {O: INK, r: "#fff1dc", a: "#f2b05e", b: "#d48a3c", i: "#fff1dc"};
-  sprite(g, BOWL, x + 16, y, food);
+  sprite(g, BOWL, x + 16, y, BOWL_PAL.food);
   g.rect(x + 18, y, 9, 2, "#9a6240"); g.rect(x + 19, y - 1, 7, 1, "#9a6240");
   g.rect(x + 17, y, 1, 1, INK); g.rect(x + 27, y, 1, 1, INK); g.rect(x + 18, y - 1, 1, 1, INK); g.rect(x + 26, y - 1, 1, 1, INK); g.rect(x + 19, y - 2, 7, 1, INK);
 }
@@ -881,10 +986,11 @@ function drawWindow(g, x, y, state, frame) {
   g.rect(x - 2, y + 31, WIN_W + 4, 3, edge); g.rect(x - 1, y + 31, WIN_W + 2, 2, woodL); g.rect(x - 1, y + 32, WIN_W + 2, 1, wood);
 }
 // sunlight falling through the window onto the floor
+// sunlight from the window, slanting across the floor to the front of the room
+const BEAM_Y = WALL_H + 5, BEAM_END = 174;
 function drawSunbeam(g, x, state) {
   const color = ["rgba(235,245,255,0.08)", "rgba(255,240,180,0.16)", "rgba(255,210,130,0.22)"][state];
-  const y0 = WALL_H + 5, rows = 44;
-  for (let i = 0; i < rows; i++) g.rect(x + 12 + Math.floor(i * 0.75), y0 + i, 64, 1, color);
+  for (let y = BEAM_Y; y < BEAM_END; y++) g.rect(x + 12 + Math.floor((y - BEAM_Y) * 0.75), y, 64, 1, color);
 }
 
 // ------------------------------------------------------------ pastry case (docker)
@@ -1161,19 +1267,35 @@ function drawBackdrop(g, w, frame, readings) {
   drawBunting(g, w);
   drawHangingPlant(g, 1);
   drawHangingPlant(g, w - 14);
-  drawSunbeam(g, WINDOW_X + shift, sun);
   drawRug(g, Math.floor(w / 2) - 46, 161, 92, 16);
-  drawPlant(g, 4, WALL_H + 12);
-  drawBowls(g, w - 44, 170);
-  drawYarn(g, 118, 168, "#e66767");
+  drawSunbeam(g, WINDOW_X + shift, sun);
+  drawPlant(g, PLANT_X, PLANT_Y);
+  drawBowls(g, w - 44, BOWLS_Y);
+  drawYarn(g, 62, 170, "#e66767");
   drawYarn(g, w - 104, 160, "#9085e9");
+}
+
+// ------------------------------------------------------------ errands
+// The potted plant stands in the front corner and the bowls on the right, both on the
+// floor where kittens play; the sunbeam's patch is where it crosses that floor.
+const PLANT_X = 4, PLANT_Y = 178, BOWLS_Y = 170;
+
+function attractions(w, readings) {
+  const sunX = WINDOW_X + wallShift(w);
+  return [
+    {kind: "water", x: w - 38, y: 171, facing: 1},     // the bowls' centres (drawBowls at w - 44)
+    {kind: "food", x: w - 22, y: 171, facing: 1},
+    {kind: "plant", x: PLANT_X + 27, y: 171, facing: -1},
+    // the part of the beam on the play floor, kept clear of the beam's edges
+    {kind: "sun", area: {x0: sunX + 100, y0: 154, x1: sunX + 128, y1: 168}},
+  ];
 }
 
 const art = {
   id: "32bit", px: 2, width: W, height: H,
   // kittens play on the open floor in front of the trees, below this line
   playTop: 150,
-  spots, postFor, catAnchors, kittenPlace, kittenHover, kittenBubble, boardText,
+  spots, postFor, catAnchors, kittenPlace, kittenHover, kittenBubble, boardText, attractions,
   drawBackdrop, drawTree, drawCat, drawKittenWorking, drawKittenPlaying, drawMan,
 };
 root.NekomataArt = root.NekomataArt || {};

@@ -18,6 +18,12 @@
 //   drawCat(g, spot, accent, pose, frame)
 //   drawKittenWorking(g, place, accent, frame, index, yarnColor)
 //   drawKittenPlaying(g, play, accent, frame, yarnColor)
+//                         play.errand, when set, is {kind, phase, x, y, facing}: walking
+//                         ("go") to, or busy ("do") at, one of its attractions
+//   attractions(w, readings)
+//                         optional: where kittens go on errands — {kind: "water" | "food" |
+//                         "plant", x, y, facing} where a kitten stands to drink, eat or swat,
+//                         and {kind: "sun", area: {x0, y0, x1, y1}} for the sunbeam
 //   drawMan(g, x, frame, carrying, heading)
 //                         the drawing itself, onto g.rect(x, y, w, h, color)
 //
@@ -98,6 +104,39 @@ const KITTEN = [
 "SSSSSSS.",
 "SSSSSSST",
 ".SS.SS..",
+];
+// kittens on errands: swatting at a plant (two frames, facing right), and napping
+const KITTEN_PAW_A = [
+".S...S..",
+".SSSSS.S",
+".SKSKS.S",
+".SSSSSS.",
+"SSSSSS..",
+"SSSSSST.",
+".SS.SS..",
+];
+const KITTEN_PAW_B = [
+".S...S..",
+".SSSSS..",
+".SKSKSSS",
+".SSSSS..",
+"SSSSSSS.",
+"SSSSSST.",
+".SS.SS..",
+];
+const KITTEN_NAP_A = [
+"..S.S.....",
+".SSSSSSSS.",
+".SKKSKKSSS",
+".SSSSSSSSS",
+"..TTSSSTT.",
+];
+const KITTEN_NAP_B = [
+"..S.S..SS.",
+".SSSSSSSSS",
+".SKKSKKSSS",
+".SSSSSSSSS",
+"..TTSSSTT.",
 ];
 // the adoption man: short, bald, glasses, shirt & tie (H skin, G glasses,
 // W shirt, T tie, B pants, S shoes)
@@ -498,13 +537,14 @@ function boardText(w) {
 function drawBackdrop(g, w, frame, readings) {
   const shift = wallShift(w);
   drawRoom(g, w);
+  drawSunbeam(g, w, readings.cpuLoad);
   drawWindow(g, WINDOW_X + shift, readings.cpuLoad, frame);
   drawCase(g, CASE_X + shift, readings.docker, frame);
   drawBoard(g, BOARD.x + shift);
   drawBunting(g, w);
   drawHangingPlant(g, 4);
   drawHangingPlant(g, w - 21);
-  drawWaterBowl(g, w - 106, 330);
+  drawWaterBowl(g, bowlsX(w), BOWL_Y);
   drawCoffee(g, COFFEE_X + shift, readings.gpu, frame);
   drawYarn(g, 206, 332, "#e66767");
   drawYarn(g, w - 160, 324, "#9085e9");
@@ -576,18 +616,64 @@ function drawKittenWorking(g, place, accent, frame, index, yarnColor) {
   drawMiniYarn(g, place.centerX - 4 + batted * 5, place.bottom - 4 - hop, yarnColor);
 }
 
-// A finished kitten roams the floor after its ball: play = {x, y, ballX, ballY}.
+// A finished kitten roams the floor after its ball: play = {x, y, ballX, ballY}, and
+// sometimes play.errand (see attractions below).
 function drawKittenPlaying(g, play, accent, frame, yarnColor) {
   drawMiniYarn(g, play.ballX - 4, play.ballY - 4, yarnColor);
-  drawBitmap(g, KITTEN, play.x - 12,
-    play.y - KITTEN.length * 3 + (frame % 2 ? 1 : 0), 3, catColors(accent));
+  const errand = play.errand && play.errand.phase === "do" ? play.errand : null;
+  const colors = catColors(accent);
+  if (errand && errand.kind === "sun") {
+    // curled up asleep in the warm patch, breathing
+    const rows = Math.floor(frame / 3) % 2 ? KITTEN_NAP_B : KITTEN_NAP_A;
+    drawBitmap(g, rows, play.x - 15, play.y - rows.length * 3, 3, colors);
+  } else if (errand && errand.kind === "plant") {
+    let rows = frame % 2 ? KITTEN_PAW_B : KITTEN_PAW_A;
+    if (errand.facing < 0) rows = rows.map((row) => [...row].reverse().join(""));
+    drawBitmap(g, rows, play.x - 12, play.y - rows.length * 3, 3, colors);
+  } else if (errand) {
+    // head down in the bowl, bobbing; the bowl's front is drawn again over its paws
+    drawBitmap(g, KITTEN, play.x - 12, play.y - KITTEN.length * 3 + 4 + frame % 2, 3, colors);
+    const bowl = Math.round(errand.x) - 12;
+    g.rect(bowl, BOWL_Y, 24, 8, "#fffaf0");
+    g.rect(bowl, BOWL_Y + 8, 24, 2, "#c9976e");
+  } else {
+    drawBitmap(g, KITTEN, play.x - 12,
+      play.y - KITTEN.length * 3 + (frame % 2 ? 1 : 0), 3, colors);
+  }
+}
+
+// ------------------------------------------------------------ errands
+const BOWL_Y = 330;
+const bowlsX = (w) => w - 106;            // the water bowl's left edge; the food bowl is 30 on
+// the sunbeam on the floor under the window, on a warm or hot day
+function sunArea(w) {
+  const x = WINDOW_X + wallShift(w);
+  return {x0: x + 40, y0: 140, x1: x + 120, y1: 160};
+}
+
+function drawSunbeam(g, w, load) {
+  if (load < 35) return;
+  const x = WINDOW_X + wallShift(w);
+  const color = load >= 70 ? "rgba(255,226,150,0.20)" : "rgba(255,236,180,0.10)";
+  for (let i = 0; i < 72; i += 4)
+    g.rect(x + 8 + Math.round(i * 0.75), WALL_H + 4 + i, 104, 4, color);
+}
+
+function attractions(w, readings) {
+  const list = [
+    {kind: "water", x: bowlsX(w) + 12, y: BOWL_Y + 3, facing: 1},
+    {kind: "food", x: bowlsX(w) + 42, y: BOWL_Y + 3, facing: 1},
+    {kind: "plant", x: 52, y: 141, facing: -1},
+  ];
+  if (readings.cpuLoad >= 35) list.push({kind: "sun", area: sunArea(w)});
+  return list;
 }
 
 const art = {
   id: "8bit", px: 1, width: W, height: H,
   // kittens play on the floor below this line
   playTop: 135,
-  spots, postFor, catAnchors, kittenPlace, kittenHover, kittenBubble, boardText,
+  spots, postFor, catAnchors, kittenPlace, kittenHover, kittenBubble, boardText, attractions,
   drawBackdrop, drawTree, drawCat, drawKittenWorking, drawKittenPlaying, drawMan,
 };
 root.NekomataArt = root.NekomataArt || {};

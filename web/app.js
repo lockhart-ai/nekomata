@@ -45,6 +45,8 @@ function fitSceneToViewport() {
   if (wanted === sceneW) return false;
   sceneW = wanted;
   canvas.width = sceneW;
+  // the room's bowls, plant and sunbeam moved with the width: errands start over
+  for (const play of kittenPlay.values()) play.errand = null;
   return true;
 }
 const overlay = document.getElementById("overlay");
@@ -135,7 +137,61 @@ function kittensOf(data, sessionId) {
 // ------------------------------------------------------------ kittens at play
 const KITTEN_YARN_COLORS = ["#e05a6a", "#9085e9", "#f7d64a", "#6db5e8"];
 
-function advanceKittenPlay(play) {
+// Now and then a playing kitten leaves its yarn on an errand: a drink or a nibble at the
+// bowls when it's over on the right of the cafe, a swat at a plant it has wandered near,
+// and, while the CPU runs hot, a nap in the sunbeam. The style says where those are
+// (ART.attractions); an errand is walking there, then doing it for a while.
+const ERRAND_FRAMES = {water: [9, 15], food: [9, 15], plant: [8, 13], sun: [30, 55]};
+const HOT_CPU = 70;   // the window's "hot" sun
+
+function between([low, high]) { return low + Math.floor(Math.random() * (high - low + 1)); }
+
+function chooseErrand(play, readings) {
+  if (!ART.attractions) return null;
+  const busy = new Set([...kittenPlay.values()]
+    .filter((other) => other !== play && other.errand && other.errand.kind !== "sun")
+    .map((other) => other.errand.key));
+  const options = ART.attractions(sceneW, readings).filter((spot) => {
+    if (spot.kind === "sun") return readings.cpuLoad >= HOT_CPU;
+    if (busy.has(spot.kind + spot.x)) return false;            // one kitten at a bowl or plant
+    if (spot.kind === "plant") return Math.hypot(spot.x - play.x, spot.y - play.y) < 110 / UNIT;
+    return play.x > sceneW * 0.55;                               // the bowls, on the right
+  });
+  if (!options.length) return null;
+  // a warm kitten heads for the sun more often than not
+  const sun = options.find((spot) => spot.kind === "sun");
+  const spot = sun && Math.random() < 0.7 ? sun
+    : options[Math.floor(Math.random() * options.length)];
+  const at = spot.area
+    ? {x: spot.area.x0 + Math.random() * (spot.area.x1 - spot.area.x0),
+       y: spot.area.y0 + Math.random() * (spot.area.y1 - spot.area.y0)}
+    : {x: spot.x, y: spot.y};
+  return {kind: spot.kind, key: spot.kind + spot.x, x: at.x, y: at.y,
+          facing: spot.facing || 1, phase: "go", until: 0};
+}
+
+function runErrand(play, readings) {
+  const errand = play.errand;
+  if (errand.phase === "go") {
+    const dx = errand.x - play.x, dy = errand.y - play.y;
+    const dist = Math.hypot(dx, dy);
+    const step = 9 / UNIT;
+    if (dist <= step) {
+      play.x = errand.x; play.y = errand.y;
+      errand.phase = "do";
+      errand.until = frame + between(ERRAND_FRAMES[errand.kind]);
+    } else {
+      play.x += (dx / dist) * step;
+      play.y += (dy / dist) * step;
+    }
+  } else if (frame >= errand.until ||
+             (errand.kind === "sun" && readings.cpuLoad < HOT_CPU)) {   // the sun went in
+    play.errand = null;
+    play.nextErrand = frame + between([40, 100]);
+  }
+}
+
+function advanceKittenPlay(play, readings) {
   // distances are scene pixels of the 720x360 scene, so play looks alike in every style
   const minX = 24 / UNIT, maxX = sceneW - 24 / UNIT;
   const minY = ART.playTop, maxY = sceneH - 18 / UNIT;
@@ -150,6 +206,16 @@ function advanceKittenPlay(play) {
   if (play.ballX > maxX) { play.ballX = maxX; play.ballVX = -Math.abs(play.ballVX); }
   if (play.ballY < minY) { play.ballY = minY; play.ballVY = Math.abs(play.ballVY); }
   if (play.ballY > maxY) { play.ballY = maxY; play.ballVY = -Math.abs(play.ballVY); }
+  if (play.errand) { runErrand(play, readings); return; }
+  if (play.nextErrand === undefined) play.nextErrand = frame + between([15, 45]);
+  // the sun coming out is worth getting up for: a playing kitten heads for it soon after
+  const hot = readings.cpuLoad >= HOT_CPU;
+  if (hot && !play.sawSun) play.nextErrand = Math.min(play.nextErrand, frame + between([2, 15]));
+  play.sawSun = hot;
+  if (frame >= play.nextErrand && Math.random() < 0.2) {
+    play.errand = chooseErrand(play, readings);
+    if (play.errand) return;
+  }
   const dx = play.ballX - play.x;
   const dy = play.ballY - play.y;
   const dist = Math.hypot(dx, dy) || 1;
@@ -283,8 +349,8 @@ function drawScene() {
     ? data.history[data.history.length - 1] : null;
   const cpuLoad = latest && data.cpu_count
     ? (latest.total / data.cpu_count) * 100 : 0;
-  ART.drawBackdrop(pen, sceneW, frame,
-    {cpuLoad, docker: data ? data.docker : [], gpu: data ? data.gpu : null});
+  const readings = {cpuLoad, docker: data ? data.docker : [], gpu: data ? data.gpu : null};
+  ART.drawBackdrop(pen, sceneW, frame, readings);
   const now = data ? data.generated_at : 0;
   const bySlot = new Map();
   if (data) for (const session of data.sessions) {
@@ -316,7 +382,7 @@ function drawScene() {
                   ballVX: 0, ballVY: 0};
           kittenPlay.set(kitten.id, play);
         }
-        advanceKittenPlay(play);
+        advanceKittenPlay(play, readings);
         ART.drawKittenPlaying(pen, play, accent, frame, yarnColor);
       }
     });

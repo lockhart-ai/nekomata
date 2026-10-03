@@ -75,6 +75,42 @@ describe("the scene", () => {
   });
 });
 
+describe("kittens' errands", () => {
+  for (const style of ["8bit", "16bit", "32bit"]) {
+    test(`${style}: a kitten swats at the plant, and naps in the sun soon after the CPU runs hot`, async () => {
+      const scene = loadScene({ scripts: sceneScripts(), snapshot: cafeRun, search: `?style=${style}` });
+      const done = new Map();
+      for (let frame = 1; frame <= 219; frame++) {
+        await scene.frame();
+        const errands = JSON.parse(scene.evaluate(
+          "JSON.stringify([...kittenPlay.values()].filter((p) => p.errand && p.errand.phase === 'do')" +
+          ".map((p) => p.errand.kind))"));
+        for (const kind of errands) if (!done.has(kind)) done.set(kind, frame);
+      }
+      assert.ok(done.has("plant"), `no kitten swatted at the plant (${[...done.keys()]})`);
+      // the run's CPU turns hot at 50 s, about frame 156: no sun naps before that, and one
+      // within a few seconds of the walk over
+      assert.ok(done.get("sun") > 156 && done.get("sun") < 200, `sun nap at frame ${done.get("sun")}`);
+      assert.deepEqual(scene.problems, []);
+    });
+
+    test(`${style}: a kitten on the right of the cafe goes to the bowls`, async () => {
+      const scene = loadScene({ scripts: sceneScripts(), search: `?style=${style}`,
+        snapshot: (t, now) => cafeRun(Math.min(t, 8), now) });       // a cool cafe: no naps
+      for (let frame = 0; frame < 12; frame++) await scene.frame();
+      const kinds = new Set();
+      for (let frame = 0; frame < 400 && kinds.size < 2; frame++) {
+        scene.evaluate(`(() => { const p = [...kittenPlay.values()][0];
+          if (!p.errand) { p.x = sceneW * 0.8; p.y = sceneH * 0.8; p.ballX = p.x; p.ballY = p.y; p.nextErrand = 0; } })()`);
+        await scene.frame();
+        const errand = JSON.parse(scene.evaluate("JSON.stringify([...kittenPlay.values()][0].errand || null)"));
+        if (errand && errand.phase === "do") kinds.add(errand.kind);
+      }
+      assert.deepEqual([...kinds].sort(), ["food", "water"]);
+    });
+  }
+});
+
 describe("choosing a style", () => {
   test("?style= picks it, and one this build doesn't have keeps the default", () => {
     const pick = (search) => loadScene({ scripts: sceneScripts(), snapshot: cafeRun, search });
