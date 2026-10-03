@@ -100,7 +100,7 @@ function sky(g, gx, gy, gw, gh, state, frame) {
 }
 
 // ------------------------------------------------------------ the valance and the light
-// a rust valance with a cream trim, on the rod and over the sill as usual
+// a rust valance with a cream trim, on the rod as usual (the style draws the sill)
 function valance(g, x, y, w) {
   const edge = "#5a3a2c";
   g.rect(x - 2, y - 1, w + 4, 1, edge); g.rect(x - 3, y - 2, 2, 3, edge); g.rect(x + w + 1, y - 2, 2, 3, edge);
@@ -110,7 +110,6 @@ function valance(g, x, y, w) {
       dot(g, x + i, y + j, j === 0 ? "#e08a5a" : j >= deep - 1 ? "#f6e2c0" : (i % 6 === 2 ? "#b0502e" : "#c8643a"));
     dot(g, x + i, y + deep, "rgba(60,30,20,0.30)");
   }
-  g.rect(x - 2, y + 31, w + 4, 3, edge); g.rect(x - 1, y + 31, w + 2, 2, "#dba673"); g.rect(x - 1, y + 32, w + 2, 1, "#b47a50");
 }
 // a low amber light, faint when it rains
 function sunbeam(g, x, state) {

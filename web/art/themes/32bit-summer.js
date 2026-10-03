@@ -300,7 +300,7 @@ function decor(g, w, frame, places) {
 }
 
 // ------------------------------------------------------------ the window's valance and light
-// a cabana-striped valance, on the rod and over the sill as usual
+// a cabana-striped valance, on the rod as usual (the style draws the sill)
 function valance(g, x, y, w) {
   const edge = "#5a3a2c";
   g.rect(x - 2, y - 1, w + 4, 1, edge); g.rect(x - 3, y - 2, 2, 3, edge); g.rect(x + w + 1, y - 2, 2, 3, edge);
@@ -311,7 +311,6 @@ function valance(g, x, y, w) {
     dot(g, x + i, y, stripe ? "#ffffff" : "#8ad6e2"); dot(g, x + i, y + deep - 1, cD);
     dot(g, x + i, y + deep, "rgba(60,30,20,0.30)");
   }
-  g.rect(x - 2, y + 31, w + 4, 3, edge); g.rect(x - 1, y + 31, w + 2, 2, "#dba673"); g.rect(x - 1, y + 32, w + 2, 1, "#b47a50");
 }
 // a strong summer beam across the floor
 function sunbeam(g, x, state) {
