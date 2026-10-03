@@ -45,6 +45,8 @@ function fitSceneToViewport() {
   if (wanted === sceneW) return false;
   sceneW = wanted;
   canvas.width = sceneW;
+  // the room's bowls, plant and sunbeam moved with the width: errands start over
+  for (const play of kittenPlay.values()) play.errand = null;
   return true;
 }
 const overlay = document.getElementById("overlay");
