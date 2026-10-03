@@ -365,6 +365,8 @@ function drawSpotWithCat(slot, session, now, workingKittens) {
       status === "thinking" ? "open" : "closed",
     pending: session.pending_tasks,
     flash: (taskFlashUntil.get(session.id) || 0) > frame,
+    // the same number for this cat every time, for whatever a style picks per cat
+    seed,
   }, frame);
 }
 
