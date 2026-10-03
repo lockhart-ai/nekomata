@@ -121,6 +121,8 @@ them to the page directly, so no server or Python is involved:
   waits on a permission card, sips **coffee** while it's paused or its background subagents
   run on, and **sleeps** while it waits on you. Tool calls and notes are the speech bubbles.
 - Marking a task done (or deleting it) sends the adoption man to carry its cat out.
+- **Clicking a cat opens its task** in Glade, switching workspace if it lives in another;
+  clicking a kitten opens its task on that subagent's log.
 - The window, the pastry case and the espresso machine follow your Mac's load once you let
   them: Nekomata asks for Glade's `machine` capability, which shows under it in
   **Settings › Plugins** as **Can see your Mac's CPU, GPU and Docker load**, off until you

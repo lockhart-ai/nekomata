@@ -759,6 +759,18 @@ describe("connect", () => {
     assert.equal(scenes.length, 1);
   });
 
+  test("opening a cat's task asks Glade for it, and a kitten's for its subagent too", () => {
+    const win = fakeWindow();
+    const link = connect(win, () => {}, () => NOW);
+    win.send(snapshot({ tasks: [task("t1")], subagents: [subagent("s1", "t1")] }));
+    link.open("t1");
+    link.open("t1", "s1");
+    assert.deepEqual(win.posted.filter((message) => message.type === "openTask"), [
+      { type: "openTask", taskId: "t1", subagentId: null },
+      { type: "openTask", taskId: "t1", subagentId: "s1" },
+    ]);
+  });
+
   test("outside Glade, with no bridge, there's nothing to connect to", () => {
     assert.equal(connect({ addEventListener() {} }, () => {}), null);
   });
