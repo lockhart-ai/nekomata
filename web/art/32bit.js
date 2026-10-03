@@ -304,6 +304,7 @@ function drawCat(g, spot, accent, pose, frame) {
     const top = py - 16 + (slow ? 0 : 1);
     sprite(g, CAT_HEAD, cx - 18, top, pal);
     sprite(g, FACES.shut.rows, cx - 18, top + FACES.shut.y + 1, pal);
+    if (theme.catOutfit) theme.catOutfit(g, {x: cx - 18, y: top, w: 22, asleep: true}, accent, frame);
     return;
   }
   const {startled, waiting, raisingHand} = pose;
@@ -329,6 +330,7 @@ function drawCat(g, spot, accent, pose, frame) {
   const sip = waiting && pose.sipping;
   const face = FACES[startled ? "wide" : sip ? "shut" : pose.blink ? "blink" : "open"];
   sprite(g, face.rows, x - 11 + look, hy + face.y, pal);
+  if (theme.catOutfit) theme.catOutfit(g, {x: x - 11, y: hy, w: 22, asleep: false}, accent, frame);
   if (pose.laptop) drawLaptop(laptopPen, cx, py, accent, pose.laptop, frame, pose.pending, pose.flash);
   // paws and the mug, in front of the laptop
   if (typing) {
@@ -820,7 +822,8 @@ function drawHangingPlant(g, x) {  // x = left edge; hangs from the ceiling
   });
 }
 
-function drawBunting(g, w) {
+function drawBunting(g, w, frame) {
+  if (theme.bunting) { theme.bunting(g, w, frame || 0); return; }
   const colors = ["#f4a9b8", "#a9dcc8", "#f6d878", "#c0b0e6"];
   const yAt = (x) => 2 + [0, 1, 1, 2, 2, 2, 2, 2, 1, 1, 0, 0][Math.floor(((x % 48) + 48) % 48 / 4)];
   for (let x = 0; x < w; x++) g.rect(x, yAt(x), 1, 1, "#9a7458");
@@ -939,6 +942,17 @@ function drawWindow(g, x, y, state, frame) {
   g.rect(x, y, WIN_W, 32, edge);
   g.rect(x + 1, y + 1, WIN_W - 2, 30, wood); g.rect(x + 1, y + 1, WIN_W - 2, 1, woodL); g.rect(x + 1, y + 1, 1, 30, woodL);
   g.rect(gx - 1, gy - 1, gw + 2, gh + 2, woodD);
+  if (theme.sky) theme.sky(g, gx, gy, gw, gh, state, frame || 0);
+  else drawView(g, gx, gy, gw, gh, state, f);
+  // glass shine
+  for (let i = 0; i < 6; i++) g.rect(gx + 50 - i, gy + 5 + i, 2, 1, "rgba(255,255,255,0.35)");
+  // mullions
+  g.rect(gx + 27, gy, 2, gh, wood); g.rect(gx + 27, gy, 1, gh, woodL);
+  g.rect(gx, gy, gw, 1, "rgba(60,30,20,0.25)"); g.rect(gx, gy, 1, gh, "rgba(60,30,20,0.25)");
+  drawValance(g, x, y, edge, wood, woodL);
+}
+// the everyday view: sky, sun and hills
+function drawView(g, gx, gy, gw, gh, state, f) {
   // sky
   const sky = [["#bfe3f4", "#d3edf8", "#e6f5fb"], ["#8fd0f2", "#b3e0f6", "#fdf0c4"], ["#f9b877", "#fbcf8e", "#fde5ae"]][state];
   g.rect(gx, gy, gw, gh, sky[0]);
@@ -968,11 +982,8 @@ function drawWindow(g, x, y, state, frame) {
   for (let i = 0; i < gw; i++) { const hh = farH[Math.floor(i / 2) % farH.length]; g.rect(gx + i, gy + gh - 4 - hh, 1, hh + 4, far); }
   const nearH = [3, 3, 4, 4, 5, 5, 5, 4, 4, 3, 3, 2, 2, 2, 2, 3, 3, 4, 4, 4, 3, 3, 2, 2, 2, 3, 4, 5];
   for (let i = 0; i < gw; i++) { const hh = nearH[Math.floor((i + 9) / 2) % nearH.length]; g.rect(gx + i, gy + gh - hh, 1, hh, near); }
-  // glass shine
-  for (let i = 0; i < 6; i++) g.rect(gx + 50 - i, gy + 5 + i, 2, 1, "rgba(255,255,255,0.35)");
-  // mullions
-  g.rect(gx + 27, gy, 2, gh, wood); g.rect(gx + 27, gy, 1, gh, woodL);
-  g.rect(gx, gy, gw, 1, "rgba(60,30,20,0.25)"); g.rect(gx, gy, 1, gh, "rgba(60,30,20,0.25)");
+}
+function drawValance(g, x, y, edge, wood, woodL) {
   // valance on a rod
   g.rect(x - 2, y - 1, WIN_W + 4, 1, edge); g.rect(x - 3, y - 2, 2, 3, edge); g.rect(x + WIN_W + 1, y - 2, 2, 3, edge);
   for (let i = 0; i < WIN_W; i++) {
@@ -1091,7 +1102,7 @@ function drawCase(g, x, y, containers, frame) {
   (containers || []).slice(0, 6).forEach((c, i) => {
     if (!c) return;
     const px = x + 6 + (i % 3) * 19, py = y + (i < 3 ? 8 : 21);
-    drawPastry(g, px, py, i, c.busy, frame + i);
+    (theme.pastry || drawPastry)(g, px, py, i, c.busy, frame + i);
   });
   // glass reflections and corner posts
   for (let i = 0; i < 6; i++) g.rect(x + 56 - i, y + 7 + i, 2, 1, "rgba(255,255,255,0.40)");
@@ -1247,6 +1258,40 @@ const WINDOW_X = 16, WINDOW_Y = 13, CASE_X = 88, CASE_Y = 12, BOARD_X = 162, BOA
 const ESPRESSO_X = 305, ESPRESSO_Y = 17;
 const wallShift = (w) => Math.round((w - W) / 2);
 
+// ------------------------------------------------------------ themes
+// A theme dresses the cafe for a season. It lives in web/art/themes/32bit-<id>.js and
+// registers itself with registerTheme; app.js picks one with setTheme. Every hook is
+// optional, and a theme that leaves one out gets the everyday cafe there:
+//   sky(g, x, y, w, h, sunState, frame)   the view through the window's glass, in place of
+//                                          the sky, sun and hills (sunState: 0 cool, 1 warm, 2 hot)
+//   bunting(g, w, frame)                   in place of the bunting along the top of the wall
+//   pastry(g, x, y, index, busy, frame)    in place of each cake in the case (a 12x8 spot;
+//                                          busy = that container is working hard)
+//   decor(g, w, frame, places)             more decorations, drawn after the room's own props
+//                                          and before the trees and cats; places says where
+//                                          the props are (see placesFor)
+//   catOutfit(g, head, accent, frame)      worn by every cat, drawn over its head: head is
+//                                          {x, y, w, asleep} for the 22-wide head's top-left
+//   front(g, w, h, frame)                  drawn over the whole scene (falling snow, leaves)
+const THEMES = {};
+let theme = {};
+function registerTheme(id, hooks) { THEMES[id] = hooks; }
+function setTheme(id) { theme = THEMES[id] || {}; return !!THEMES[id]; }
+function placesFor(w) {
+  const shift = wallShift(w);
+  return {
+    w, h: H, wallH: WALL_H,
+    window: {x: WINDOW_X + shift, y: WINDOW_Y, w: WIN_W, h: WIN_H},
+    pastryCase: {x: CASE_X + shift, y: CASE_Y, w: CASE_W, h: CASE_H},
+    board: {x: BOARD_X + shift, y: BOARD_Y, w: BOARD_W, h: BOARD_H},
+    espresso: {x: ESPRESSO_X + shift, y: ESPRESSO_Y},
+    plant: {x: PLANT_X, y: PLANT_Y},
+    bowls: {x: w - 44, y: BOWLS_Y},
+    rug: {x: Math.floor(w / 2) - 46, y: 161, w: 92, h: 16},
+  };
+}
+function drawForeground(g, w, frame) { if (theme.front) theme.front(g, w, H, frame); }
+
 function boardText(w) {
   const x = BOARD_X + wallShift(w);
   // the text uses the whole slate, top to bottom
@@ -1264,7 +1309,7 @@ function drawBackdrop(g, w, frame, readings) {
     readings.docker.map((container) => ({busy: container.cpu >= 20})), frame);
   drawBoard(g, BOARD_X + shift, BOARD_Y);
   drawEspresso(g, ESPRESSO_X + shift, ESPRESSO_Y, espressoState(readings.gpu), frame);
-  drawBunting(g, w);
+  drawBunting(g, w, frame);
   drawHangingPlant(g, 1);
   drawHangingPlant(g, w - 14);
   drawRug(g, Math.floor(w / 2) - 46, 161, 92, 16);
@@ -1273,6 +1318,7 @@ function drawBackdrop(g, w, frame, readings) {
   drawBowls(g, w - 44, BOWLS_Y);
   drawYarn(g, 62, 170, "#e66767");
   drawYarn(g, w - 104, 160, "#9085e9");
+  if (theme.decor) theme.decor(g, w, frame, placesFor(w));
 }
 
 // ------------------------------------------------------------ errands
@@ -1297,6 +1343,9 @@ const art = {
   playTop: 150,
   spots, postFor, catAnchors, kittenPlace, kittenHover, kittenBubble, boardText, attractions,
   drawBackdrop, drawTree, drawCat, drawKittenWorking, drawKittenPlaying, drawMan,
+  drawForeground, setTheme, registerTheme,
+  // what a theme file draws with, so it matches the style
+  kit: {sprite, disc, mix, hash, catPalette, INK, W, H, WALL_H, placesFor},
 };
 root.NekomataArt = root.NekomataArt || {};
 root.NekomataArt[art.id] = art;

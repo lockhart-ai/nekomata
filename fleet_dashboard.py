@@ -737,7 +737,9 @@ def load_page_html() -> str:
     index = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     styles = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
     # the art styles (web/art/) register themselves ahead of the scene that draws with them
-    scripts = sorted((WEB_DIR / "art").glob("*.js")) + [WEB_DIR / "app.js"]
+    # then the seasonal themes, which register with their style
+    scripts = (sorted((WEB_DIR / "art").glob("*.js")) + sorted((WEB_DIR / "art" / "themes").glob("*.js"))
+               + [WEB_DIR / "app.js"])
     app = "\n".join(script.read_text(encoding="utf-8") for script in scripts)
     return index.replace("/*__STYLES__*/", styles).replace("/*__APP__*/", app)
 

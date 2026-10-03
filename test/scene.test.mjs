@@ -36,13 +36,13 @@ describe("the scene", () => {
   });
 
   test("the 16bit style draws the cafe run as recorded", async () => {
-    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=16bit" });
+    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=16bit&theme=none" });
     assert.deepEqual(problems, []);
     assertMatchesGolden("cafe-run-16bit", hashes);
   });
 
   test("the 32bit style draws the cafe run as recorded", async () => {
-    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=32bit" });
+    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=32bit&theme=none" });
     assert.deepEqual(problems, []);
     assertMatchesGolden("cafe-run-32bit", hashes);
   });

@@ -7,7 +7,7 @@
 // nothing remote, so everything is inlined and nothing is fetched.
 //
 //   node glade/build.mjs [--out <dir>]   # default: dist/glade/nekomata
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -22,6 +22,17 @@ export function styles() {
   return readdirSync(join(ROOT, "web", "art")).filter((name) => name.endsWith(".js"))
     .map((name) => name.slice(0, -3)).sort((a, b) => parseInt(a, 10) - parseInt(b, 10) || a.localeCompare(b));
 }
+
+/** The seasonal themes this build carries (web/art/themes/<style>-<id>.js), by id. */
+export function themes() {
+  const dir = join(ROOT, "web", "art", "themes");
+  if (!existsSync(dir)) return [];
+  return [...new Set(readdirSync(dir).filter((name) => name.endsWith(".js"))
+    .map((name) => name.slice(0, -3).split("-").slice(1).join("-")))].sort();
+}
+
+const THEME_LABELS = { halloween: "Halloween", christmas: "Christmas", spring: "Spring",
+  summer: "Summer", autumn: "Autumn" };
 
 /**
  * The plugin's manifest.json, versioned with the extension. It asks for Glade's
@@ -39,13 +50,23 @@ export function manifest() {
       key: "style", label: "Art style", type: "select",
       options: styles().map((id) => ({ value: id, label: id.replace(/bit$/, "-bit") })),
       default: "8bit",
+    }, {
+      // seasonal themes, for the styles that have them (32bit)
+      key: "theme", label: "Theme", type: "select",
+      options: [{ value: "seasonal", label: "Seasonal (by date)" }, { value: "none", label: "None" },
+        ...themes().map((id) => ({ value: id, label: THEME_LABELS[id] || id }))],
+      default: "seasonal",
     }],
   };
 }
 
 /** The scene's scripts, in the order the page inlines them: the art styles, then the scene. */
 export function sceneScripts() {
-  return [...styles().map((id) => `web/art/${id}.js`), "web/app.js"];
+  const themeFiles = existsSync(join(ROOT, "web", "art", "themes"))
+    ? readdirSync(join(ROOT, "web", "art", "themes")).filter((name) => name.endsWith(".js")).sort()
+    : [];
+  return [...styles().map((id) => `web/art/${id}.js`),
+    ...themeFiles.map((name) => `web/art/themes/${name}`), "web/app.js"];
 }
 
 /** The single inlined page: styles, then the Glade adapter, the art and the scene. */

@@ -67,6 +67,21 @@
           "default": "8bit",
           "description": "The cafe's art style."
         },
+        "nekomata.theme": {
+          "type": "string",
+          "enum": ["seasonal", "none", "halloween", "christmas", "spring", "summer", "autumn"],
+          "enumDescriptions": [
+            "Follow the date: Christmas in December, Halloween in late October, and the seasons between.",
+            "The everyday cafe.",
+            "Pumpkins, bats and witch hats.",
+            "Snow, a tree with lights and Santa hats.",
+            "Cherry blossom and flower crowns.",
+            "A blazing window, ice cream and sunglasses.",
+            "Falling leaves, warm drinks and scarves."
+          ],
+          "default": "seasonal",
+          "description": "A seasonal theme for the cafe. Themes are drawn for the 32bit style."
+        },
         "nekomata.port": {
           "type": "number",
           "default": 8787,

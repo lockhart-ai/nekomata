@@ -89,6 +89,37 @@ function useStyle(id) {
   return true;
 }
 
+// Themes (web/art/themes/) dress a style's cafe for a season; only styles with a setTheme
+// have any. "seasonal" follows the date, "none" is the everyday cafe, or a theme by id.
+// Each season is [theme, from month, from day, to month, to day], first match wins.
+const SEASONS = [
+  ["christmas", 12, 1, 1, 6],
+  ["halloween", 10, 15, 10, 31],
+  ["autumn", 9, 22, 11, 30],
+  ["spring", 3, 20, 5, 31],
+  ["summer", 6, 21, 8, 31],
+];
+let themeChoice = "seasonal";
+
+function seasonalTheme(date) {
+  const day = (date.getMonth() + 1) * 100 + date.getDate();
+  for (const [id, fromMonth, fromDay, toMonth, toDay] of SEASONS) {
+    const from = fromMonth * 100 + fromDay, to = toMonth * 100 + toDay;
+    if (from <= to ? day >= from && day <= to : day >= from || day <= to) return id;
+  }
+  return "none";
+}
+
+function applyTheme() {
+  if (!ART.setTheme) return;
+  const id = themeChoice === "seasonal" ? seasonalTheme(new Date()) : themeChoice;
+  ART.setTheme(id);   // an id the style doesn't have, "none" included, is the everyday cafe
+}
+
+function requestedTheme() {
+  try { return new URLSearchParams(location.search).get("theme"); } catch (error) { return null; }
+}
+
 function requestedStyle() {
   try { return new URLSearchParams(location.search).get("style"); } catch (error) { return null; }
 }
@@ -388,6 +419,7 @@ function drawScene() {
     });
   }
   drawAdoptionRuns();
+  if (ART.drawForeground) ART.drawForeground(pen, sceneW, frame);
 }
 
 // ------------------------------------------------------------ overlays (DOM text)
@@ -648,8 +680,10 @@ function trackAdoptions(cats) {
 }
 
 function apply(data) {
-  // Glade hands the plugin's style setting over with its data
+  // Glade hands the plugin's style and theme settings over with its data
   if (data.style) useStyle(data.style);
+  if (data.theme) themeChoice = data.theme;
+  applyTheme();
   fitSceneToViewport();
   const cats = data.sessions.filter((s) => !s.parent_id);
   // Freeze the layout while a departure is pending (or detected this cycle):
@@ -774,6 +808,8 @@ window.addEventListener("resize", () => {
 });
 document.documentElement.dataset.style = ART.id;
 useStyle(requestedStyle());
+themeChoice = requestedTheme() || themeChoice;
+applyTheme();
 fitSceneToViewport();
 if (typeof BOOTSTRAP === "object" && BOOTSTRAP) apply(BOOTSTRAP);
 drawScene();
