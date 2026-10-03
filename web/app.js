@@ -30,10 +30,20 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g,
 // ------------------------------------------------------------ scene state
 const canvas = document.getElementById("scene");
 const context = canvas.getContext("2d");
-// what a style draws onto
+// The scene is two layers: the room on the bottom canvas, and everything in it (trees,
+// cats, kittens, the adoption man) on a second one above the overlay's chalkboard text, so
+// a cat in front of the board covers the board's writing too.
+const actorsCanvas = document.getElementById("actors");
+const actorsContext = actorsCanvas.getContext("2d");
+// what a style draws onto: the layer drawScene has picked
 const pen = {
-  rect(x, y, w, h, color) { context.fillStyle = color; context.fillRect(x, y, w, h); },
+  layer: context,
+  rect(x, y, w, h, color) { this.layer.fillStyle = color; this.layer.fillRect(x, y, w, h); },
 };
+
+function sizeCanvases(width, height) {
+  for (const layer of [canvas, actorsCanvas]) { layer.width = width; layer.height = height; }
+}
 
 function fitSceneToViewport() {
   // Widen the scene to the viewport's aspect ratio; the style lays its room
@@ -44,7 +54,7 @@ function fitSceneToViewport() {
     Math.max(SCENE_W, Math.round(sceneH * box.width / box.height)));
   if (wanted === sceneW) return false;
   sceneW = wanted;
-  canvas.width = sceneW;
+  sizeCanvases(sceneW, sceneH);
   // the room's bowls, plant and sunbeam moved with the width: errands start over
   for (const play of kittenPlay.values()) play.errand = null;
   return true;
@@ -75,8 +85,7 @@ function useStyle(id) {
   SCENE_W_MAX = Math.round(2400 / UNIT);
   sceneW = SCENE_W;
   sceneH = ART.height;
-  canvas.width = sceneW;
-  canvas.height = sceneH;
+  sizeCanvases(sceneW, sceneH);
   document.documentElement.dataset.style = ART.id;
   // Positions are in the old style's pixels: start the floor over, with no
   // ceremonies for cats that were already here.
@@ -344,6 +353,8 @@ function workingKittensOf(data, sessionId) {
 
 function drawScene() {
   context.clearRect(0, 0, sceneW, sceneH);
+  actorsContext.clearRect(0, 0, sceneW, sceneH);
+  pen.layer = context;
   const data = latestData;
   const latest = data && data.history.length
     ? data.history[data.history.length - 1] : null;
@@ -351,6 +362,7 @@ function drawScene() {
     ? (latest.total / data.cpu_count) * 100 : 0;
   const readings = {cpuLoad, docker: data ? data.docker : [], gpu: data ? data.gpu : null};
   ART.drawBackdrop(pen, sceneW, frame, readings);
+  pen.layer = actorsContext;                    // the rest stands in front of the board's text
   const now = data ? data.generated_at : 0;
   const bySlot = new Map();
   if (data) for (const session of data.sessions) {

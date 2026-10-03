@@ -46,20 +46,14 @@ function makeCanvas(width, height, box) {
       const x0 = Math.max(0, Math.round(x)), x1 = Math.min(width, Math.round(x + w));
       const y0 = Math.max(0, Math.round(y)), y1 = Math.min(height, Math.round(y + h));
       for (let py = y0; py < y1; py++)
-        for (let px = x0; px < x1; px++) {
-          const i = (py * width + px) * 4;
-          pixels[i] = pixels[i] * (1 - a) + r * a;
-          pixels[i + 1] = pixels[i + 1] * (1 - a) + g * a;
-          pixels[i + 2] = pixels[i + 2] * (1 - a) + b * a;
-          pixels[i + 3] = 255;
-        }
+        for (let px = x0; px < x1; px++) blend(pixels, (py * width + px) * 4, r, g, b, a);
     },
     clearRect() { pixels.fill(0); },
   };
   return canvas;
 }
 
-function encodePng(width, height, pixels, zoom) {
+function encodePng(width, height, pixels, zoom, keepAlpha = false) {
   const w = width * zoom, h = height * zoom;
   const raw = Buffer.alloc((w * 4 + 1) * h);
   for (let y = 0; y < h; y++) {
@@ -67,7 +61,7 @@ function encodePng(width, height, pixels, zoom) {
     for (let x = 0; x < w; x++) {
       const from = (Math.floor(y / zoom) * width + Math.floor(x / zoom)) * 4;
       raw[row + x * 4] = pixels[from]; raw[row + x * 4 + 1] = pixels[from + 1];
-      raw[row + x * 4 + 2] = pixels[from + 2]; raw[row + x * 4 + 3] = 255;
+      raw[row + x * 4 + 2] = pixels[from + 2]; raw[row + x * 4 + 3] = keepAlpha ? pixels[from + 3] : 255;
     }
   }
   const chunk = (type, data) => {
@@ -80,6 +74,27 @@ function encodePng(width, height, pixels, zoom) {
   header.writeUInt32BE(w, 0); header.writeUInt32BE(h, 4); header[8] = 8; header[9] = 6;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header),
     chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+
+// Paints a colour over a pixel ("source-over"), keeping alpha so a layer that is mostly
+// transparent can be composited over another afterwards.
+function blend(pixels, i, r, g, b, a) {
+  const under = pixels[i + 3] / 255, out = a + under * (1 - a);
+  if (!out) return;
+  pixels[i] = (r * a + pixels[i] * under * (1 - a)) / out;
+  pixels[i + 1] = (g * a + pixels[i + 1] * under * (1 - a)) / out;
+  pixels[i + 2] = (b * a + pixels[i + 2] * under * (1 - a)) / out;
+  pixels[i + 3] = out * 255;
+}
+
+// The scene's layers flattened into one picture: the room, then what stands in it.
+function flatten(layers) {
+  const out = new Uint8ClampedArray(layers[0].pixels);
+  for (const layer of layers.slice(1))
+    for (let i = 0; i < out.length; i += 4)
+      if (layer.pixels[i + 3]) blend(out, i, layer.pixels[i], layer.pixels[i + 1],
+        layer.pixels[i + 2], layer.pixels[i + 3] / 255);
+  return out;
 }
 
 // ------------------------------------------------------------------ the page
@@ -123,7 +138,8 @@ export function loadScene({scripts, snapshot, box = {width: 1440, height: 720}, 
     static now() { return clock.ms; }
   }
   const canvas = makeCanvas(720, 360, {...box});
-  const elements = {scene: canvas};
+  const actors = makeCanvas(720, 360, canvas.box);
+  const elements = {scene: canvas, actors};
   const sandbox = {
     console, Date: FakeDate, Math: seededMath(20261002), JSON, Promise, Map, Set, Object, Array,
     String, Number, Infinity, NaN, parseFloat, parseInt, isNaN, AbortController, URLSearchParams,
@@ -157,6 +173,7 @@ export function loadScene({scripts, snapshot, box = {width: 1440, height: 720}, 
     /** Resizes the panel the scene sits in, as dragging its edge would. */
     async resize(width, height) {
       canvas.box = {width, height};
+      actors.box = canvas.box;
       for (const listener of clock.listeners.resize || []) listener();
       await settle();
     },
@@ -174,11 +191,17 @@ export function loadScene({scripts, snapshot, box = {width: 1440, height: 720}, 
     hash() {
       const overlay = elements.overlay ? elements.overlay.innerHTML : "";
       return createHash("sha1").update(`${canvas.width}x${canvas.height}`)
-        .update(canvas.pixels).update(overlay).digest("hex").slice(0, 12);
+        .update(flatten([canvas, actors])).update(overlay).digest("hex").slice(0, 12);
+    },
+    /** Each layer on its own as a PNG (the room, and what stands in it), to stack under and
+     *  over the overlay as the page does. */
+    layerPngs() {
+      return {room: encodePng(canvas.width, canvas.height, canvas.pixels, 1),
+              actors: encodePng(actors.width, actors.height, actors.pixels, 1, true)};
     },
     /** The canvas as a PNG, `zoom` image pixels per canvas pixel: for looking at a frame. */
     png(zoom = 1) {
-      return encodePng(canvas.width, canvas.height, canvas.pixels, zoom);
+      return encodePng(canvas.width, canvas.height, flatten([canvas, actors]), zoom);
     },
   };
 }
