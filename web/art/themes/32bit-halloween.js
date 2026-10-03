@@ -4,7 +4,7 @@
 (function (root) {
 "use strict";
 const art = root.NekomataArt["32bit"];
-const {sprite, disc, mix, INK} = art.kit;
+const {sprite, disc, mix, INK, WALL_H} = art.kit;
 
 // a pen that only paints inside a rectangle (the window's glass)
 function clipped(g, x0, y0, x1, y1) {
@@ -45,10 +45,10 @@ function sky(g, x, y, w, h, state, frame) {
   for (const [sx, sy] of [[6, 8], [22, 6], [35, 10], [44, 7], [51, 12], [17, 13]])
     if (state === 0 || sy < 10) g.rect(x + sx, y + sy, 1, 1, frame % 4 === sx % 4 ? "#fff6d0" : "#b8b0d8");
   // the moon
-  const mx = x + 14, my = y + 13;
+  const mx = x + 41, my = y + 12;           // in the right-hand pane, clear of the cats' hats
   if (state === 0) {
-    disc(pen, mx, my, 5, "#f4ecc8");
-    disc(pen, mx + 3, my - 1, 4, c[0]);                       // a crescent
+    disc(pen, mx, my, 6, "#f4ecc8");
+    disc(pen, mx + 4, my - 2, 5, c[0]);                       // a crescent
   } else if (state === 1) {
     disc(pen, mx, my, 5, "#f7d98a"); disc(pen, mx, my, 4, "#fbe7a8");
     g.rect(mx - 2, my - 1, 2, 2, "#ecc670"); g.rect(mx + 1, my + 2, 1, 1, "#ecc670");
@@ -66,11 +66,34 @@ function sky(g, x, y, w, h, state, frame) {
   const far = mix(c[1], "#120c1c", 0.55), near = mix(c[1], "#120c1c", 0.78);
   const farH = [2, 3, 4, 5, 5, 6, 6, 6, 5, 5, 4, 3, 3, 2, 2, 2, 3, 4, 5, 6, 7, 7, 7, 6, 6, 5, 4, 3];
   for (let i = 0; i < w; i++) { const hh = farH[Math.floor(i / 2) % farH.length]; g.rect(x + i, y + h - 4 - hh, 1, hh + 4, far); }
-  const tx = x + 44, ty = y + h - 11;
+  const tx = x + 12, ty = y + h - 11;
   g.rect(tx, ty, 1, 6, far); g.rect(tx - 2, ty + 1, 2, 1, far); g.rect(tx - 3, ty, 1, 1, far);
   g.rect(tx + 1, ty + 2, 2, 1, far); g.rect(tx + 3, ty + 1, 1, 1, far); g.rect(tx - 1, ty + 3, 1, 1, far);
   const nearH = [3, 3, 4, 4, 5, 5, 5, 4, 4, 3, 3, 2, 2, 2, 2, 3, 3, 4, 4, 4, 3, 3, 2, 2, 2, 3, 4, 5];
   for (let i = 0; i < w; i++) { const hh = nearH[Math.floor((i + 9) / 2) % nearH.length]; g.rect(x + i, y + h - hh, 1, hh, near); }
+}
+
+// the window's valance on its rod, and the sill below (the hook draws both)
+function valanceWith(g, x, y, w, colors) {
+  const edge = "#5a3a2c";
+  g.rect(x - 2, y - 1, w + 4, 1, edge); g.rect(x - 3, y - 2, 2, 3, edge); g.rect(x + w + 1, y - 2, 2, 3, edge);
+  for (let i = 0; i < w; i++) {
+    const scallop = [4, 5, 5, 5, 4, 3][i % 6];
+    for (let j = 0; j < scallop; j++)
+      g.rect(x + i, y + j, 1, 1, j === 0 ? colors.top : j >= scallop - 1 ? colors.trim : colors.cloth);
+    g.rect(x + i, y + scallop, 1, 1, "rgba(60,30,20,0.30)");
+  }
+  g.rect(x - 2, y + 31, w + 4, 3, edge); g.rect(x - 1, y + 31, w + 2, 2, "#dba673"); g.rect(x - 1, y + 32, w + 2, 1, "#b47a50");
+}
+// a deep purple valance with an orange trim
+function valance(g, x, y, w, frame) {
+  valanceWith(g, x, y, w, {top: "#6e5a92", cloth: "#4e3e6e", trim: "#f08a3c"});
+}
+// pale moonlight on the floor instead of sunshine, brighter as the moon grows
+function sunbeam(g, x, state, frame) {
+  const color = ["rgba(210,214,255,0.06)", "rgba(220,220,255,0.09)", "rgba(255,214,170,0.12)"][state];
+  const y0 = WALL_H + 5;
+  for (let y = y0; y < 174; y++) g.rect(x + 12 + Math.floor((y - y0) * 0.75), y, 64, 1, color);
 }
 
 // ------------------------------------------------------------ bunting
@@ -225,5 +248,5 @@ function catOutfit(g, head, accent, frame) {
   sprite(g, WITCH_BRIM, head.x + 2, head.y + 3, pal);
 }
 
-art.registerTheme("halloween", {sky, bunting, pastry, decor, catOutfit});
+art.registerTheme("halloween", {sky, valance, sunbeam, bunting, pastry, decor, catOutfit});
 })(typeof globalThis === "object" ? globalThis : this);

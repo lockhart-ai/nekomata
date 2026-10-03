@@ -71,6 +71,25 @@ function sky(g, x, y, w, h, state, frame) {
   }
 }
 
+// the window's valance on its rod, and the sill below (the hook draws both)
+function valanceWith(g, x, y, w, colors) {
+  const edge = "#5a3a2c";
+  g.rect(x - 2, y - 1, w + 4, 1, edge); g.rect(x - 3, y - 2, 2, 3, edge); g.rect(x + w + 1, y - 2, 2, 3, edge);
+  for (let i = 0; i < w; i++) {
+    const scallop = [4, 5, 5, 5, 4, 3][i % 6];
+    for (let j = 0; j < scallop; j++)
+      g.rect(x + i, y + j, 1, 1, j === 0 ? colors.top : j >= scallop - 1 ? colors.trim : colors.cloth);
+    g.rect(x + i, y + scallop, 1, 1, "rgba(60,30,20,0.30)");
+  }
+  g.rect(x - 2, y + 31, w + 4, 3, edge); g.rect(x - 1, y + 31, w + 2, 2, "#dba673"); g.rect(x - 1, y + 32, w + 2, 1, "#b47a50");
+}
+// a red valance with a white fur trim and a sprig of holly in the middle
+function valance(g, x, y, w, frame) {
+  valanceWith(g, x, y, w, {top: "#f05a62", cloth: "#d9343f", trim: "#fffaf2"});
+  const cx = x + Math.floor(w / 2);
+  sprite(g, ["OO..OO", "OGOOGO", ".OrrO.", "..OO.."], cx - 3, y + 1, {O: "#1e3a2a", G: "#3e8f4a", r: "#ff5a5a"});
+}
+
 // ------------------------------------------------------------ garland and fairy lights
 const LIGHTS = ["#ff5a5a", "#ffd23e", "#5ab8ff", "#7fe08a"];
 function bunting(g, w, frame) {
@@ -174,29 +193,26 @@ function pastry(g, x, y, index, busy, frame) {
 }
 
 // ------------------------------------------------------------ decorations
-// a little tree in a pot by the wall, with a star and twinkling lights, and two presents
+// a little tree in a pot on the window sill, with a star and twinkling lights
 const XMAS_TREE = [
-"........yy........",
-".......OyyO.......",
-"........OO........",
-".......OgGO.......",
-"......OggGGO......",
-".....OgggGGGO.....",
-"......OgGGGO......",
-".....OgggGGGO.....",
-"....OggggGGGGO....",
-"...OgggggGGGGGO...",
-".....OggggGGGO....",
-"....OgggggGGGGO...",
-"...OggggggGGGGGO..",
-"..OgggggggGGGGGGO.",
-".OOOOOOOOOOOOOOOOO",
-"......OkkkkkO.....",
-"......OppppqO.....",
-"......OppppqO.....",
-".......OOOOO......",
+".....yy.....",
+"....OyyO....",
+".....OO.....",
+"....OgGO....",
+"...OggGGO...",
+"..OgggGGGO..",
+"...OggGGO...",
+"..OgggGGGO..",
+".OggggGGGGO.",
+"..OgggGGGO..",
+".OggggGGGGO.",
+"OgggggGGGGGO",
+"OOOOOOOOOOOO",
+"...OkkkkO...",
+"...OppqqO...",
+"....OOOO....",
 ];
-const TREE_LIGHTS = [[8, 5], [10, 7], [7, 9], [11, 10], [6, 12], [9, 12], [12, 13], [4, 13], [8, 4]];
+const TREE_LIGHTS = [[5, 5], [7, 7], [4, 8], [8, 9], [3, 10], [6, 10], [9, 11], [2, 11]];
 const PRESENT = ["OOOOOO", "ObbrbO", "OrrrrO", "ObbrbO", "OOOOOO"];
 const STOCKING = [
 "OOOOO..",
@@ -209,17 +225,17 @@ const STOCKING = [
 ".OOOOO.",
 ];
 function decor(g, w, frame, places) {
-  // the tree stands between the window and the pastry case
+  // the tree stands on the window sill, out of the way of the cats, with presents at its foot
   const win = places.window;
-  const tx = win.x + win.w - 4, ty = places.wallH - 9;
+  const tx = win.x + win.w - 17, ty = win.y + 31 - XMAS_TREE.length;
   sprite(g, XMAS_TREE, tx, ty, {O: "#1e3a2a", g: "#4f9a5a", G: "#2f6a48", y: "#ffd23e",
     k: "#6b4a3a", p: "#c96a4a", q: "#9a4a34"});
   TREE_LIGHTS.forEach(([lx, ly], i) => {
     const on = (i + Math.floor(frame / 2)) % 3 !== 0;
     g.rect(tx + lx, ty + ly, 1, 1, on ? LIGHTS[i % 4] : mix(LIGHTS[i % 4], "#1e3a2a", 0.6));
   });
-  sprite(g, PRESENT, tx - 3, ty + 14, {O: INK, b: "#5ab8ff", r: "#ffd23e"});
-  sprite(g, PRESENT, tx + 15, ty + 14, {O: INK, b: "#e0434f", r: "#fffaf2"});
+  sprite(g, PRESENT, tx - 6, win.y + 26, {O: INK, b: "#5ab8ff", r: "#ffd23e"});
+  sprite(g, PRESENT, tx + 12, win.y + 26, {O: INK, b: "#e0434f", r: "#fffaf2"});
   // snow on the window sill
   g.rect(win.x - 1, win.y + 30, win.w + 2, 1, "#fbfdff");
   for (let i = 1; i < win.w - 3; i += 9) { g.rect(win.x + i, win.y + 29, 4, 1, "#fbfdff"); g.rect(win.x + i + 1, win.y + 28, 2, 1, "#fbfdff"); }
@@ -265,5 +281,5 @@ function front(g, w, h, frame) {
   }
 }
 
-art.registerTheme("christmas", {sky, bunting, pastry, decor, catOutfit, front});
+art.registerTheme("christmas", {sky, valance, bunting, pastry, decor, catOutfit, front});
 })(typeof globalThis === "object" ? globalThis : this);
