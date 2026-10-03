@@ -268,21 +268,29 @@ function plant(g, x, y, frame) {
 }
 
 // ------------------------------------------------------------ the cats' bobble beanies
-// Each cat gets the yarn that stands out most from its fur. A startled cat's hat jumps.
+// A beanie pulled down over the whole top of the head, its ribbed band just above the eyes,
+// in the yarn that stands out most from the cat's fur. The ears either poke out through holes
+// in it ("holes") or are knitted into it as little ear-shaped points ("knit"). A startled
+// cat's hat jumps.
+const EAR_STYLE = "holes";
 const YARNS = ["#f2ead8", "#2e3e6e", "#e8b84a", "#d8e8f4", "#8a5aa8"];
+// rows from the head's top row - 4 (the bobble) to row 6, the band just above the eyes
 const BEANIE = [
-".......OOO.......",
-"......OoooO......",
-"......OoooO......",
-".......OOO.......",
-"....OOOOOOOOO....",
-"..OOlhhhhhhhdOO..",
-".OlhhkhhhkhhhhdO.",
-".OhhhhhkhhhhkhdO.",
-"OrRrRrRrRrRrRrRrO",
-"ORrRrRrRrRrRrRrRO",
-".OOOOOOOOOOOOOOO.",
+".........OOOO.........",
+"........OooooO........",
+"........OooooO........",
+".......OOOOOOOO.......",
+".....OOlhhhhhhdOO.....",
+"....OlhhhkhhhhhhdO....",
+"...OlhhhhhhhkhhhhdO...",
+"..OlhhkhhhhhhhhkhhdO..",
+".OlhhhhhhkhhhhhhhhhdO.",
+"OrRrRrRrRrRrRrRrRrRrRO",
+"ORrRrRrRrRrRrRrRrRrRrO",
 ];
+// the ears standing up out of it (left over head columns 1-7, right over 14-20)
+const EAR_L = ["..OO...", ".OLSO..", ".OSPSO.", "OLSPPSO", "OSPPPSO"];
+const EAR_R = ["...OO..", "..OSSO.", ".OSPDO.", "OSPPSDO", "OSPPPDO"];
 function distance(a, b) {
   const p = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
   const [x, y] = [p(a), p(b)];
@@ -294,8 +302,23 @@ function catOutfit(g, head, accent, frame) {
   const trim = main === "#f2ead8" || main === "#d8e8f4" ? "#3a6ab0" : "#f2ead8";
   const pal = {O: mix(main, "#1e1a24", 0.7), h: main, l: mix(main, "#ffffff", 0.3), d: mix(main, "#1e1a24", 0.25),
     k: mix(main, "#1e1a24", 0.12), r: trim, R: mix(trim, "#1e1a24", 0.18), o: trim};
-  const lift = head.startled ? 3 : 0;
-  sprite(g, BEANIE, head.x + 3, head.y - 5 - lift, pal);
+  const lift = head.startled ? 2 : 0;
+  // a startled cat's spiky head has its ears a pixel further in
+  const inset = head.startled ? 1 : 0;
+  const lx = head.x + 1 + inset, rx = head.x + 14 - inset;
+  sprite(g, BEANIE, head.x, head.y - 4 - lift, pal);
+  if (EAR_STYLE === "knit") {
+    // the hat's own knitted ears, jumping with it
+    const knit = {O: pal.O, L: pal.l, S: pal.h, P: pal.d, D: pal.d};
+    sprite(g, EAR_L, lx, head.y - 1 - lift, knit);
+    sprite(g, EAR_R, rx, head.y - 1 - lift, knit);
+  } else {
+    // the cat's own ears through holes in the knit, the hole's edge round their base
+    const fur = art.kit.catPalette(accent);
+    sprite(g, EAR_L, lx, head.y - 1, fur);
+    sprite(g, EAR_R, rx, head.y - 1, fur);
+    g.rect(lx, head.y + 4 - lift, 7, 1, pal.d); g.rect(rx, head.y + 4 - lift, 7, 1, pal.d);
+  }
 }
 
 // ------------------------------------------------------------ big soft flakes, slowly
