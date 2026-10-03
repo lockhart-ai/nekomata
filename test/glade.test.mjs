@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, test } from "node:test";
-import { build, manifest, page, styles } from "../glade/build.mjs";
+import { build, manifest, page, styles, themes } from "../glade/build.mjs";
 
 const require = createRequire(import.meta.url);
 const {
@@ -771,8 +771,11 @@ describe("the plugin build", () => {
     assert.deepEqual(capabilities, ["machine"]);
     // the art style is a select setting (glade#435), one option per style in web/art/
     const { settings } = manifest();
-    assert.equal(settings.length, 1);
-    const [style] = settings;
+    assert.equal(settings.length, 2);
+    const [style, theme] = settings;
+    // and the theme: the everyday cafe, by date (the default), or one of the theme files
+    assert.deepEqual([theme.key, theme.type, theme.default], ["theme", "select", "seasonal"]);
+    assert.deepEqual(theme.options.map((option) => option.value), ["default", "seasonal", ...themes()]);
     assert.deepEqual([style.key, style.type, style.default], ["style", "select", "8bit"]);
     assert.deepEqual(style.options.map((option) => option.value), styles());
     assert.ok(style.options.some((option) => option.value === "8bit" && option.label === "8-bit"));

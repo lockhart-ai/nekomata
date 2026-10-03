@@ -81,9 +81,9 @@ async function ensureServer() {
   );
 }
 
-function cafeHtml(port, style) {
+function cafeHtml(port, style, theme) {
   const origin = `http://127.0.0.1:${port}`;
-  const styleQuery = `style=${encodeURIComponent(style)}`;
+  const styleQuery = `style=${encodeURIComponent(style)}&theme=${encodeURIComponent(theme)}`;
   return `<!doctype html>
 <html>
 <head>
@@ -183,7 +183,8 @@ class NekomataViewProvider {
     webviewView.webview.html = messageHtml("🐱 opening the cafe…");
     const port = config().get("port");
     const showCafe = () => {
-      webviewView.webview.html = cafeHtml(port, config().get("style") || "8bit");
+      webviewView.webview.html = cafeHtml(port, config().get("style") || "8bit",
+        config().get("theme") || "seasonal");
     };
     try {
       await ensureServer();
@@ -191,9 +192,10 @@ class NekomataViewProvider {
     } catch (error) {
       webviewView.webview.html = messageHtml(String(error.message || error));
     }
-    // a new art style reloads the cafe with it
+    // a new art style or theme reloads the cafe with it
     const styleWatcher = vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("nekomata.style")) showCafe();
+      if (event.affectsConfiguration("nekomata.style") ||
+          event.affectsConfiguration("nekomata.theme")) showCafe();
     });
     // Push data from the extension host (Node timers are never throttled,
     // unlike timers/rAF inside the webview iframe). The wrapper relays each

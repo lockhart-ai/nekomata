@@ -111,14 +111,16 @@
     const permissions = new Map();    // permission request id → PluginPermissionRequest
     const machine = createMachine();  // the `machine` capability's readings
     let style = null;                 // the plugin's "style" setting, once Glade sends one
+    let theme = null;                 // and its "theme" setting
 
     // The art style from a `settings` object (glade#435): the snapshot carries
     // every declared setting, and `settings.changed` follows when you change one.
     // A Glade without plugin settings sends none, and the scene keeps its default.
     function readSettings(settings) {
-      const wanted = settings && typeof settings.style === "string" ? settings.style : null;
-      if (wanted === style) return false;
-      style = wanted;
+      const pick = (key) => settings && typeof settings[key] === "string" ? settings[key] : null;
+      const [wantedStyle, wantedTheme] = [pick("style"), pick("theme")];
+      if (wantedStyle === style && wantedTheme === theme) return false;
+      [style, theme] = [wantedStyle, wantedTheme];
       return true;
     }
 
@@ -362,6 +364,7 @@
         trees: [{rows: commands}], sessions,
         // the art style picked in Glade's Settings › Plugins, if it has sent one
         ...(style ? {style} : {}),
+        ...(theme ? {theme} : {}),
       };
     }
 

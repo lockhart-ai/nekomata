@@ -50,6 +50,26 @@ with a rug.
 
 ![The cafe in the 32bit style](docs/style-32bit.png)
 
+### Seasonal themes
+
+The `32bit` style dresses up for the seasons: **Halloween** (a night window with bats, witch
+hats, jack-o'-lanterns), **Christmas** (snow, a tree with presents, Santa hats), **winter**
+(snowdrifts, cocoa, a wood stove, knitted beanies), **spring** (blossom, tulips, a flower by
+one ear), **summer** (a beach, ice creams, sunglasses) and **autumn** (falling leaves, pies,
+scarves). By default the theme follows the date:
+
+| Theme | Dates |
+|---|---|
+| Winter | January 7 to March 19 |
+| Spring | March 20 to May 31 |
+| Summer | June 1 to August 31 |
+| Autumn | September 1 to November 30, around Halloween |
+| Halloween | October 15 to 31 |
+| Christmas | December 1 to January 6 |
+
+so there is always one. The `nekomata.theme` setting (or `?theme=`, or **Theme** in Glade) picks
+one for good instead, or `default` for the everyday cafe.
+
 Pick one with the `nekomata.style` setting in your editor, or add `?style=16bit` to the page's
 address when you open it yourself. In Glade it is the plugin's **Art style** setting, under
 Settings › Plugins.
@@ -139,6 +159,7 @@ Settings under `nekomata.*`:
 | Setting | Default | Description |
 |---|---|---|
 | `nekomata.style` | `8bit` | The art style: `8bit`, `16bit` or `32bit`. |
+| `nekomata.theme` | `seasonal` | A seasonal theme for the `32bit` style: `default` (the everyday cafe), `seasonal` (by date), `halloween`, `christmas`, `winter`, `spring`, `summer` or `autumn`. |
 | `nekomata.port` | `8787` | Port the server listens on. |
 | `nekomata.pythonPath` | `python3` | Python 3 interpreter for the server. |
 | `nekomata.serverScript` | *(bundled)* | Override path to `fleet_dashboard.py`. |
