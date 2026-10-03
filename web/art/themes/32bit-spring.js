@@ -357,22 +357,18 @@ function decor(g, w, frame, places) {
 }
 
 // ------------------------------------------------------------ the cats' flower hats
-// Each cat wears one big flower on its head, between its ears: five round petals about a
+// Each cat wears a flower tucked in at one ear, the side fixed per cat: five petals about a
 // round centre, outlined in the cat's own outline colour. Keys: O outline, l/p/d petal lit,
-// main and shade (d also marks the creases between petals), c/C the centre and its shade.
+// main and shade, c/C the centre and its shade. Drawn for the left ear; mirrored for the right.
 const HAT = [
-".....OOOO.....",
-"....OllppO....",
-".OOOOlpppOOOO.",
-"OllpdppppdlppO",
-"OlpppdppdpppdO",
-"OppppdccdpppdO",
-"OppppcccCpppdO",
-".OdppcCCCpddO.",
-".OlppdCCdppdO.",
-".OlpppddppddO.",
-".OpppdOOpdddO.",
-"..OOOO..OOOO..",
+"...OOO...",
+".OOlppOO.",
+"OlpdpdlpO",
+"OpppcppdO",
+".OpccCdO.",
+"OlpdCdpdO",
+"OpppOppdO",
+".OOO.OOO.",
 ];
 // each cat's flower is picked by the hue of its fur, so it stands out: yellow on blue, lilac
 // and pink fur, pink on green, lilac on amber and orange, white on red
@@ -394,9 +390,11 @@ function hatFor(accent) {
   return HAT_FLOWERS[h < 10 ? "white" : h < 90 ? "lilac" : h < 180 ? "pink" : "yellow"];
 }
 function catOutfit(g, head, accent, frame) {
-  // centred on the head, its lower petals resting on the crown; a startled cat's fur lifts it
-  const x = head.x + head.w / 2 - HAT[0].length / 2, y = head.y - 8 - (head.startled ? 2 : 0);
-  sprite(g, HAT, x, y, Object.assign({O: catPalette(accent).O}, hatFor(accent)));
+  // just inside the ear, over its base; a startled cat's fur lifts it
+  const right = (head.seed || 0) % 2 === 1, hw = HAT[0].length;
+  const dx = 3, x = right ? head.x + head.w - dx - hw : head.x + dx;
+  const y = head.y - 1 - (head.startled ? 1 : 0);
+  sprite(g, HAT, x, y, Object.assign({O: catPalette(accent).O}, hatFor(accent)), right);
 }
 
 // ------------------------------------------------------------ drifting petals
