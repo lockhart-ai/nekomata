@@ -389,22 +389,23 @@ function drawKittenPlay(g, cx, by, accent, frame, flip) {
   if (f) { g.rect(flip ? hx - 2 : hx + 9, by - 2, 2, 2, pal.B); g.rect(hx + (flip ? 3 : 4), by - 1, 2, 1, pal.B); }
 }
 
-// Errands. Head down in a bowl: the same crouch as the pounce, the face lowered into the
-// bowl with its eyes shut, lapping (a one-pixel dip). Drawn facing right from (cx, by).
-const KIT_HEAD_DOWN = [
+// Errands. At a bowl: sitting up behind the dish, bobbing its head down into it (eyes shut,
+// muzzle behind the bowl's front) and back up. (cx, by): the bowl's centre and the
+// kitten's feet, behind the bowl; `flip` puts its tail on the left.
+const KIT_HEAD_DOWN = [         // eyes shut and set high: the rest of the face is in the dish
 "SS.....SS",
 "SPS...SPS",
 "SSSSSSSSS",
-"SSSSSSSSS",
 "SKKSSSKKS",
+"SSSSSSSSS",
 "SSSBPBSSS",
 ".SSBBBSS.",
 ];
 function drawKittenAtBowl(g, cx, by, accent, frame, flip) {
-  const pal = catPalette(accent), f = frame % 2;
-  const at = (x, w) => flip ? 2 * cx - x - w + 1 : x;        // mirror about cx
-  sprite(g, KIT_SIDE_B, at(cx - 8, 10), by - 7, pal, flip);
-  sprite(g, KIT_HEAD_DOWN, at(cx + 1, 9), by - 10 + f, pal, flip);
+  const pal = catPalette(accent), dipped = frame % 2 === 1;
+  sprite(g, KIT_SIT_BODY, flip ? cx - 6 : cx - 4, by - 4, pal, flip);
+  if (dipped) sprite(g, KIT_HEAD_DOWN, cx - 4, by - 7, pal);       // four pixels down
+  else sprite(g, KIT_HEAD, cx - 4, by - 11, pal);
 }
 // Swatting at the plant: standing, head up, one front paw raised and batting at the leaves
 // (wound up, then swiped down and forward). Drawn facing right from (cx, by).
@@ -1004,23 +1005,24 @@ function drawKittenPlaying(g, play, accent, frame, yarnColor) {
   if (errand.kind === "sun") drawKittenNapping(g, x, y, accent, frame);
   else if (errand.kind === "plant") drawKittenSwatting(g, x, y, accent, frame, flip);
   else {
-    // its face goes in behind the bowl's front; a drop or a crumb hops out now and then
+    // the dish stands in front of it: whole while its head is up, just the front over its
+    // muzzle when it dips in; a drop or a crumb hops out now and then
     drawKittenAtBowl(g, x, y, accent, frame, flip);
-    const bowlX = flip ? x - 10 : x + 1;
-    drawBowl(g, bowlX, BOWL_Y, errand.kind, true);
+    const bowlX = x - 4, dipped = frame % 2 === 1;
+    drawBowl(g, bowlX, BOWL_Y, errand.kind, dipped);
     if (frame % 4 === 1) g.rect(flip ? bowlX - 1 : bowlX + 10, BOWL_Y - 2, 1, 1, BOWLS[errand.kind][errand.kind === "water" ? 1 : 0]);
   }
 }
 
 // ------------------------------------------------------------ errands
-// where kittens go: a bowl each to drink and eat at (water from the left, food from the
-// right), the potted plant's right side to swat at it, and the warm patch of the sunbeam
+// where kittens go: a bowl each to drink and eat at (sitting behind it, tails outward), the
+// potted plant's right side to swat at it, and the warm patch of the sunbeam
 const BOWL_Y = 136;
 const bowlsX = (w) => w - 34;            // the water bowl's left edge; the food bowl is 12 on
 function attractions(w, readings) {
   const list = [
-    {kind: "water", x: bowlsX(w) - 1, y: BOWL_Y + 4, facing: 1},
-    {kind: "food", x: bowlsX(w) + 22, y: BOWL_Y + 4, facing: -1},
+    {kind: "water", x: bowlsX(w) + 4, y: BOWL_Y + 3, facing: -1},
+    {kind: "food", x: bowlsX(w) + 16, y: BOWL_Y + 3, facing: 1},
     {kind: "plant", x: 20, y: WALL_H + 12, facing: -1},
   ];
   // the middle of the beam drawSunbeam lays on the floor (its rows run WALL_H + 4 to + 35)
