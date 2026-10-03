@@ -330,7 +330,7 @@ function drawCat(g, spot, accent, pose, frame) {
   const sip = waiting && pose.sipping;
   const face = FACES[startled ? "wide" : sip ? "shut" : pose.blink ? "blink" : "open"];
   sprite(g, face.rows, x - 11 + look, hy + face.y, pal);
-  if (theme.catOutfit) theme.catOutfit(g, {x: x - 11, y: hy, w: 22, asleep: false}, accent, frame);
+  if (theme.catOutfit) theme.catOutfit(g, {x: x - 11, y: hy, w: 22, asleep: false, startled}, accent, frame);
   if (pose.laptop) drawLaptop(laptopPen, cx, py, accent, pose.laptop, frame, pose.pending, pose.flash);
   // paws and the mug, in front of the laptop
   if (typing) {
@@ -951,6 +951,8 @@ function drawWindow(g, x, y, state, frame) {
   g.rect(gx, gy, gw, 1, "rgba(60,30,20,0.25)"); g.rect(gx, gy, 1, gh, "rgba(60,30,20,0.25)");
   if (theme.valance) theme.valance(g, x, y, WIN_W, frame || 0);
   else drawValance(g, x, y, edge, wood, woodL);
+  // sill
+  g.rect(x - 2, y + 31, WIN_W + 4, 3, edge); g.rect(x - 1, y + 31, WIN_W + 2, 2, woodL); g.rect(x - 1, y + 32, WIN_W + 2, 1, wood);
 }
 // the everyday view: sky, sun and hills
 function drawView(g, gx, gy, gw, gh, state, f) {
@@ -994,8 +996,6 @@ function drawValance(g, x, y, edge, wood, woodL) {
     }
     g.rect(x + i, y + scallop, 1, 1, "rgba(60,30,20,0.30)");
   }
-  // sill
-  g.rect(x - 2, y + 31, WIN_W + 4, 3, edge); g.rect(x - 1, y + 31, WIN_W + 2, 2, woodL); g.rect(x - 1, y + 32, WIN_W + 2, 1, wood);
 }
 // sunlight falling through the window onto the floor
 // sunlight from the window, slanting across the floor to the front of the room
@@ -1276,8 +1276,12 @@ const wallShift = (w) => Math.round((w - W) / 2);
 //   sunbeam(g, x, sunState, frame)         in place of the light on the floor below the
 //                                          window (x: the window's left), or null for none;
 //                                          kittens still nap in that patch when it's hot
+//   plant(g, x, y, frame)                  in place of the potted plant in the front-left corner
+//                                          ((x, y) the pot's bottom-left); kittens still come
+//                                          over to swat at whatever stands there
 //   catOutfit(g, head, accent, frame)      worn by every cat, drawn over its head: head is
-//                                          {x, y, w, asleep} for the 22-wide head's top-left
+//                                          {x, y, w, asleep, startled} for the 22-wide head's
+//                                          top-left (a startled cat's fur stands on end)
 //   front(g, w, h, frame)                  drawn over the whole scene (falling snow, leaves)
 const THEMES = {};
 let theme = {};
@@ -1322,7 +1326,8 @@ function drawBackdrop(g, w, frame, readings) {
   // a theme can light the floor its own way (a moonbeam), or not at all (sunbeam: null)
   if (!("sunbeam" in theme)) drawSunbeam(g, WINDOW_X + shift, sun);
   else if (theme.sunbeam) theme.sunbeam(g, WINDOW_X + shift, sun, frame);
-  drawPlant(g, PLANT_X, PLANT_Y);
+  if (theme.plant) theme.plant(g, PLANT_X, PLANT_Y, frame);
+  else drawPlant(g, PLANT_X, PLANT_Y);
   drawBowls(g, w - 44, BOWLS_Y);
   drawYarn(g, 62, 170, "#e66767");
   drawYarn(g, w - 104, 160, "#9085e9");
