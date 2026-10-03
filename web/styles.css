@@ -53,7 +53,9 @@
     overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start;
   }
   .board-text .board-title { font-weight: 700; letter-spacing: 0.5px; color: #fffaf2; }
-  .board-text div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* lines keep their height: ones that don't fit are cut off at the slate's edge, not squeezed
+     on top of each other */
+  .board-text div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
   /* 16bit: chalk on a green-grey slate, the title in butter yellow */
   html[data-style="16bit"] .board-text { color: #f4efe0; }
   html[data-style="16bit"] .board-text .board-title { color: #f7e3a8; }
