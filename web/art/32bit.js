@@ -949,7 +949,8 @@ function drawWindow(g, x, y, state, frame) {
   // mullions
   g.rect(gx + 27, gy, 2, gh, wood); g.rect(gx + 27, gy, 1, gh, woodL);
   g.rect(gx, gy, gw, 1, "rgba(60,30,20,0.25)"); g.rect(gx, gy, 1, gh, "rgba(60,30,20,0.25)");
-  drawValance(g, x, y, edge, wood, woodL);
+  if (theme.valance) theme.valance(g, x, y, WIN_W, frame || 0);
+  else drawValance(g, x, y, edge, wood, woodL);
 }
 // the everyday view: sky, sun and hills
 function drawView(g, gx, gy, gw, gh, state, f) {
@@ -1270,6 +1271,11 @@ const wallShift = (w) => Math.round((w - W) / 2);
 //   decor(g, w, frame, places)             more decorations, drawn after the room's own props
 //                                          and before the trees and cats; places says where
 //                                          the props are (see placesFor)
+//   valance(g, x, y, w, frame)             in place of the pink valance over the window
+//                                          (x, y: the window frame's top-left, w its width)
+//   sunbeam(g, x, sunState, frame)         in place of the light on the floor below the
+//                                          window (x: the window's left), or null for none;
+//                                          kittens still nap in that patch when it's hot
 //   catOutfit(g, head, accent, frame)      worn by every cat, drawn over its head: head is
 //                                          {x, y, w, asleep} for the 22-wide head's top-left
 //   front(g, w, h, frame)                  drawn over the whole scene (falling snow, leaves)
@@ -1313,7 +1319,9 @@ function drawBackdrop(g, w, frame, readings) {
   drawHangingPlant(g, 1);
   drawHangingPlant(g, w - 14);
   drawRug(g, Math.floor(w / 2) - 46, 161, 92, 16);
-  drawSunbeam(g, WINDOW_X + shift, sun);
+  // a theme can light the floor its own way (a moonbeam), or not at all (sunbeam: null)
+  if (!("sunbeam" in theme)) drawSunbeam(g, WINDOW_X + shift, sun);
+  else if (theme.sunbeam) theme.sunbeam(g, WINDOW_X + shift, sun, frame);
   drawPlant(g, PLANT_X, PLANT_Y);
   drawBowls(g, w - 44, BOWLS_Y);
   drawYarn(g, 62, 170, "#e66767");
