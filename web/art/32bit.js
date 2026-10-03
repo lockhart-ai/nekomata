@@ -157,9 +157,9 @@ const CAT_BODY = [
 ];
 const CAT_TAIL_A = [
 "...OOO....",
-"..OTTTO...",
 "..OSSSO...",
-"..OTTTO...",
+"..OSSSO...",
+"..OSSSO...",
 "...OSSSO..",
 "....OSSSO.",
 ".....OSSO.",
@@ -173,9 +173,9 @@ const CAT_TAIL_A = [
 ];
 const CAT_TAIL_B = [
 ".....OOO..",
-"....OTTTO.",
 "....OSSSO.",
-"....OTTTO.",
+"....OSSSO.",
+"....OSSSO.",
 "....OSSSO.",
 "....OSSSO.",
 ".....OSSO.",
@@ -283,8 +283,8 @@ const CAT_MOUND_B = [       // breathing in: one row taller
 ];
 const CAT_TAIL_WRAP = [     // tail curled round to the front
 "..OOOOOOOOOOOOO.",
-".OTSSTSSSSSSSSDO",
-"OTTSSTSSSSSSDDDO",
+".OSSSSSSSSSSSSDO",
+"OSSSSSSSSSSSDDDO",
 ".OOOOOOOOOOOOOO.",
 ];
 
@@ -620,7 +620,7 @@ const CAT_CARRIED_BODY = [
 "..OOOOOOOOO..",
 ];
 const MAN_FOREARM = [".OOOO", "OWHHO", "OvHNO", ".OOOO"];
-const CARRIED_TAIL = ["OO.", "OSO", "OSO", ".OSO", ".OTO", "..O"];
+const CARRIED_TAIL = ["OO.", "OSO", "OSO", ".OSO", ".OSO", "..O"];
 
 // He faces the room whichever way he walks; a cat he carries trails its tail behind him.
 function drawMan(g, x, frame, carrying, heading) {
