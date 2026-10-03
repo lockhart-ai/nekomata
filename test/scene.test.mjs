@@ -9,7 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { sceneScripts } from "../glade/build.mjs";
+import { sceneScripts, themes } from "../glade/build.mjs";
 import { cafeRun, loadScene, playCafeRun } from "./scene-harness.mjs";
 
 const GOLDEN = join(dirname(fileURLToPath(import.meta.url)), "golden");
@@ -109,6 +109,35 @@ describe("kittens' errands", () => {
       assert.deepEqual([...kinds].sort(), ["food", "water"]);
     });
   }
+});
+
+describe("seasonal themes", () => {
+  test("Seasonal follows the date, and leaves gaps for the everyday cafe", () => {
+    const scene = loadScene({ scripts: sceneScripts(), snapshot: cafeRun, search: "?style=32bit" });
+    const on = (date) => scene.evaluate(`seasonalTheme(new Date(${JSON.stringify(date)}))`);
+    assert.equal(on("2026-12-24T12:00:00"), "christmas");
+    assert.equal(on("2027-01-03T12:00:00"), "christmas");
+    assert.equal(on("2026-10-31T12:00:00"), "halloween");
+    assert.equal(on("2026-10-02T12:00:00"), "autumn");
+    assert.equal(on("2026-11-15T12:00:00"), "autumn");
+    assert.equal(on("2026-04-10T12:00:00"), "spring");
+    assert.equal(on("2026-07-15T12:00:00"), "summer");
+    assert.equal(on("2026-02-14T12:00:00"), "none");
+  });
+
+  for (const id of themes()) {
+    test(`32bit ${id}: draws the cafe run as recorded`, async () => {
+      const { hashes, problems } = await playCafeRun(sceneScripts(), { search: `?style=32bit&theme=${id}` });
+      assert.deepEqual(problems, []);
+      assertMatchesGolden(`cafe-run-32bit-${id}`, hashes);
+    });
+  }
+
+  test("a theme only dresses the style that has it, and 'none' is the everyday cafe", async () => {
+    const run = async (search) => (await playCafeRun(sceneScripts(), { search })).hashes;
+    assert.deepEqual(await run("?style=16bit&theme=christmas"), await run("?style=16bit&theme=none"));
+    assert.notDeepEqual(await run("?style=32bit&theme=christmas"), await run("?style=32bit&theme=none"));
+  });
 });
 
 describe("choosing a style", () => {
