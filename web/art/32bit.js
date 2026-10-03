@@ -951,6 +951,8 @@ function drawWindow(g, x, y, state, frame) {
   g.rect(gx, gy, gw, 1, "rgba(60,30,20,0.25)"); g.rect(gx, gy, 1, gh, "rgba(60,30,20,0.25)");
   if (theme.valance) theme.valance(g, x, y, WIN_W, frame || 0);
   else drawValance(g, x, y, edge, wood, woodL);
+  // sill
+  g.rect(x - 2, y + 31, WIN_W + 4, 3, edge); g.rect(x - 1, y + 31, WIN_W + 2, 2, woodL); g.rect(x - 1, y + 32, WIN_W + 2, 1, wood);
 }
 // the everyday view: sky, sun and hills
 function drawView(g, gx, gy, gw, gh, state, f) {
@@ -994,8 +996,6 @@ function drawValance(g, x, y, edge, wood, woodL) {
     }
     g.rect(x + i, y + scallop, 1, 1, "rgba(60,30,20,0.30)");
   }
-  // sill
-  g.rect(x - 2, y + 31, WIN_W + 4, 3, edge); g.rect(x - 1, y + 31, WIN_W + 2, 2, woodL); g.rect(x - 1, y + 32, WIN_W + 2, 1, wood);
 }
 // sunlight falling through the window onto the floor
 // sunlight from the window, slanting across the floor to the front of the room
