@@ -330,7 +330,7 @@ function drawCat(g, spot, accent, pose, frame) {
   const sip = waiting && pose.sipping;
   const face = FACES[startled ? "wide" : sip ? "shut" : pose.blink ? "blink" : "open"];
   sprite(g, face.rows, x - 11 + look, hy + face.y, pal);
-  if (theme.catOutfit) theme.catOutfit(g, {x: x - 11, y: hy, w: 22, asleep: false}, accent, frame);
+  if (theme.catOutfit) theme.catOutfit(g, {x: x - 11, y: hy, w: 22, asleep: false, startled}, accent, frame);
   if (pose.laptop) drawLaptop(laptopPen, cx, py, accent, pose.laptop, frame, pose.pending, pose.flash);
   // paws and the mug, in front of the laptop
   if (typing) {
@@ -1277,7 +1277,8 @@ const wallShift = (w) => Math.round((w - W) / 2);
 //                                          window (x: the window's left), or null for none;
 //                                          kittens still nap in that patch when it's hot
 //   catOutfit(g, head, accent, frame)      worn by every cat, drawn over its head: head is
-//                                          {x, y, w, asleep} for the 22-wide head's top-left
+//                                          {x, y, w, asleep, startled} for the 22-wide head's
+//                                          top-left (a startled cat's fur stands on end)
 //   front(g, w, h, frame)                  drawn over the whole scene (falling snow, leaves)
 const THEMES = {};
 let theme = {};
