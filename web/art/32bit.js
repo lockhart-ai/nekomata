@@ -1276,6 +1276,9 @@ const wallShift = (w) => Math.round((w - W) / 2);
 //   sunbeam(g, x, sunState, frame)         in place of the light on the floor below the
 //                                          window (x: the window's left), or null for none;
 //                                          kittens still nap in that patch when it's hot
+//   plant(g, x, y, frame)                  in place of the potted plant in the front-left corner
+//                                          ((x, y) the pot's bottom-left); kittens still come
+//                                          over to swat at whatever stands there
 //   catOutfit(g, head, accent, frame)      worn by every cat, drawn over its head: head is
 //                                          {x, y, w, asleep, startled} for the 22-wide head's
 //                                          top-left (a startled cat's fur stands on end)
@@ -1323,7 +1326,8 @@ function drawBackdrop(g, w, frame, readings) {
   // a theme can light the floor its own way (a moonbeam), or not at all (sunbeam: null)
   if (!("sunbeam" in theme)) drawSunbeam(g, WINDOW_X + shift, sun);
   else if (theme.sunbeam) theme.sunbeam(g, WINDOW_X + shift, sun, frame);
-  drawPlant(g, PLANT_X, PLANT_Y);
+  if (theme.plant) theme.plant(g, PLANT_X, PLANT_Y, frame);
+  else drawPlant(g, PLANT_X, PLANT_Y);
   drawBowls(g, w - 44, BOWLS_Y);
   drawYarn(g, 62, 170, "#e66767");
   drawYarn(g, w - 104, 160, "#9085e9");
