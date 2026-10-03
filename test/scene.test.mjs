@@ -36,13 +36,13 @@ describe("the scene", () => {
   });
 
   test("the 16bit style draws the cafe run as recorded", async () => {
-    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=16bit&theme=none" });
+    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=16bit&theme=default" });
     assert.deepEqual(problems, []);
     assertMatchesGolden("cafe-run-16bit", hashes);
   });
 
   test("the 32bit style draws the cafe run as recorded", async () => {
-    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=32bit&theme=none" });
+    const { hashes, problems } = await playCafeRun(sceneScripts(), { search: "?style=32bit&theme=default" });
     assert.deepEqual(problems, []);
     assertMatchesGolden("cafe-run-32bit", hashes);
   });
@@ -112,7 +112,7 @@ describe("kittens' errands", () => {
 });
 
 describe("seasonal themes", () => {
-  test("Seasonal follows the date, and leaves gaps for the everyday cafe", () => {
+  test("Seasonal follows the date, with a theme for every day of the year", () => {
     const scene = loadScene({ scripts: sceneScripts(), snapshot: cafeRun, search: "?style=32bit" });
     const on = (date) => scene.evaluate(`seasonalTheme(new Date(${JSON.stringify(date)}))`);
     assert.equal(on("2026-12-24T12:00:00"), "christmas");
@@ -123,7 +123,12 @@ describe("seasonal themes", () => {
     assert.equal(on("2026-04-10T12:00:00"), "spring");
     assert.equal(on("2026-07-15T12:00:00"), "summer");
     assert.equal(on("2027-02-14T12:00:00"), "winter");
-    assert.equal(on("2026-06-10T12:00:00"), "none");
+    assert.equal(on("2026-06-10T12:00:00"), "summer");
+    assert.equal(on("2026-09-10T12:00:00"), "autumn");
+    // every day of a leap year has a theme
+    const missing = scene.evaluate(`(() => { const out = []; for (let d = new Date(2028, 0, 1); d.getFullYear() === 2028; d.setDate(d.getDate() + 1))
+      if (seasonalTheme(d) === "default") out.push(d.toDateString()); return out.join(", "); })()`);
+    assert.equal(missing, "");
   });
 
   for (const id of themes()) {
@@ -134,10 +139,10 @@ describe("seasonal themes", () => {
     });
   }
 
-  test("a theme only dresses the style that has it, and 'none' is the everyday cafe", async () => {
+  test("a theme only dresses the style that has it, and 'default' is the everyday cafe", async () => {
     const run = async (search) => (await playCafeRun(sceneScripts(), { search })).hashes;
-    assert.deepEqual(await run("?style=16bit&theme=christmas"), await run("?style=16bit&theme=none"));
-    assert.notDeepEqual(await run("?style=32bit&theme=christmas"), await run("?style=32bit&theme=none"));
+    assert.deepEqual(await run("?style=16bit&theme=christmas"), await run("?style=16bit&theme=default"));
+    assert.notDeepEqual(await run("?style=32bit&theme=christmas"), await run("?style=32bit&theme=default"));
   });
 });
 

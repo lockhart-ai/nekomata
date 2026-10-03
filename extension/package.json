@@ -69,10 +69,10 @@
         },
         "nekomata.theme": {
           "type": "string",
-          "enum": ["seasonal", "none", "halloween", "christmas", "winter", "spring", "summer", "autumn"],
+          "enum": ["default", "seasonal", "halloween", "christmas", "winter", "spring", "summer", "autumn"],
           "enumDescriptions": [
-            "Follow the date: Christmas in December, Halloween in late October, and the seasons between.",
             "The everyday cafe.",
+            "Follow the date: Christmas in December, Halloween in late October, and the seasons between.",
             "Pumpkins, bats and witch hats.",
             "Snow, a tree with lights and Santa hats.",
             "Snow and cocoa after the holidays, and woolly hats.",

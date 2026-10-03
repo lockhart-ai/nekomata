@@ -90,15 +90,16 @@ function useStyle(id) {
 }
 
 // Themes (web/art/themes/) dress a style's cafe for a season; only styles with a setTheme
-// have any. "seasonal" follows the date, "none" is the everyday cafe, or a theme by id.
-// Each season is [theme, from month, from day, to month, to day], first match wins.
+// have any. "default" is the everyday cafe, "seasonal" follows the date, or a theme by id.
+// Each season is [theme, from month, from day, to month, to day], first match wins; together
+// they cover the whole year, so "seasonal" always has a theme.
 const SEASONS = [
   ["christmas", 12, 1, 1, 6],
   ["winter", 1, 7, 3, 19],
   ["halloween", 10, 15, 10, 31],
-  ["autumn", 9, 22, 11, 30],
+  ["autumn", 9, 1, 11, 30],
   ["spring", 3, 20, 5, 31],
-  ["summer", 6, 21, 8, 31],
+  ["summer", 6, 1, 8, 31],
 ];
 let themeChoice = "seasonal";
 
@@ -108,13 +109,13 @@ function seasonalTheme(date) {
     const from = fromMonth * 100 + fromDay, to = toMonth * 100 + toDay;
     if (from <= to ? day >= from && day <= to : day >= from || day <= to) return id;
   }
-  return "none";
+  return "default";   // unreachable while the seasons cover the year
 }
 
 function applyTheme() {
   if (!ART.setTheme) return;
   const id = themeChoice === "seasonal" ? seasonalTheme(new Date()) : themeChoice;
-  ART.setTheme(id);   // an id the style doesn't have, "none" included, is the everyday cafe
+  ART.setTheme(id);   // an id the style doesn't have, "default" included, is the everyday cafe
 }
 
 function requestedTheme() {

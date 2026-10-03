@@ -753,9 +753,9 @@ describe("the plugin build", () => {
     const { settings } = manifest();
     assert.equal(settings.length, 2);
     const [style, theme] = settings;
-    // and the seasonal theme: by date by default, or none, or one of the theme files
+    // and the theme: the everyday cafe, by date (the default), or one of the theme files
     assert.deepEqual([theme.key, theme.type, theme.default], ["theme", "select", "seasonal"]);
-    assert.deepEqual(theme.options.map((option) => option.value), ["seasonal", "none", ...themes()]);
+    assert.deepEqual(theme.options.map((option) => option.value), ["default", "seasonal", ...themes()]);
     assert.deepEqual([style.key, style.type, style.default], ["style", "select", "8bit"]);
     assert.deepEqual(style.options.map((option) => option.value), styles());
     assert.ok(style.options.some((option) => option.value === "8bit" && option.label === "8-bit"));

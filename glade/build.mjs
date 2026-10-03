@@ -53,7 +53,7 @@ export function manifest() {
     }, {
       // seasonal themes, for the styles that have them (32bit)
       key: "theme", label: "Theme", type: "select",
-      options: [{ value: "seasonal", label: "Seasonal (by date)" }, { value: "none", label: "None" },
+      options: [{ value: "default", label: "Default" }, { value: "seasonal", label: "Seasonal (by date)" },
         ...themes().map((id) => ({ value: id, label: THEME_LABELS[id] || id }))],
       default: "seasonal",
     }],
