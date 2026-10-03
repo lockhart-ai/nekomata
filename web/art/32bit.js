@@ -466,17 +466,6 @@ const KIT_TAIL_WRAP = [
 "ODSSSSSSTTO",
 ".OOOOOOOOO.",
 ];
-// crouched over a bowl: the back rising behind its head, tail up
-const KIT_BACK = [
-".........OO",
-"........OSO",
-"........OSO",
-"...OOOOOOSO",
-"..OSSTSTSSO",
-".OSSSSSSSDO",
-"OSSSSSSSSDO",
-"OSSSSSSSDDO",
-];
 
 // working: sits beside the trunk batting a little yarn ball. `side` is which side of the
 // trunk it sits on (-1 left, +1 right); the ball is on its outer side, the tail on the inner.
@@ -508,7 +497,7 @@ function drawKittenPlaying(g, play, accent, frame, yarnColor) {
     return drawKittenWalk(g, x, y, pal, f, errand.x < play.x ? -1 : 1);
   if (errand && errand.kind === "sun") return drawKittenNap(g, x, y, pal, Math.floor(frame / 3) % 2);
   if (errand && errand.kind === "plant") return drawKittenSwat(g, x, y, pal, f, errand.facing);
-  if (errand) return drawKittenAtBowl(g, errand.kind, Math.round(errand.x) - 6, pal, f);
+  if (errand) return drawKittenAtBowl(g, errand.kind, x, y, pal, f);
   const flip = ballX < x;
   const cx = x + (flip ? 6 : -6), by = y + 2;
   const reach = Math.hypot(play.ballX - play.x, play.ballY - play.y) < 11;
@@ -546,15 +535,18 @@ function drawKittenSwat(g, x, y, pal, f, facing) {
   else sprite(g, KIT_PAW, out < 0 ? x - 9 : x + 6, y - 9, pal);
 }
 
-// face down in a bowl, seen from the front: ears and shut eyes over the rim, the bowl's
-// front drawn again over its muzzle, a drop or a crumb flicked out as it laps or nibbles
-function drawKittenAtBowl(g, kind, bx, pal, f) {
-  sprite(g, KIT_BACK, bx + 6, BOWLS_Y - 11 + f, pal);
-  sprite(g, KIT_HEAD_SHUT, bx, BOWLS_Y - 6 + f, pal);
+// sitting up behind its bowl, bobbing its head down into it and back up; the bowl's front
+// is drawn again over its paws and, on the dip, its muzzle. The tail is on the outer side,
+// away from the other bowl. A drop or a crumb flies as the head comes up.
+function drawKittenAtBowl(g, kind, x, by, pal, f) {
+  const bx = x - 6, outer = kind === "water" ? -1 : 1;
+  sprite(g, KIT_SIT_BODY, outer < 0 ? x - 9 : x - 5, by - 5, pal, outer < 0);
+  if (f) sprite(g, KIT_HEAD_SHUT, x - 6, by - 8, pal);
+  else sprite(g, KIT_HEAD, x - 6, by - 14, pal);
   sprite(g, BOWL.slice(2), bx, BOWLS_Y + 2, BOWL_PAL[kind]);
   if (!f) {
     const bit = kind === "water" ? "#8fd0f5" : "#9a6240";
-    g.rect(bx - 1, BOWLS_Y - 1, 1, 1, bit); g.rect(bx + 13, BOWLS_Y - 3, 1, 1, bit);
+    g.rect(bx - 1, by - 9, 1, 1, bit); g.rect(bx + 13, by - 11, 1, 1, bit);
   }
 }
 
