@@ -1257,7 +1257,8 @@ const wallShift = (w) => Math.round((w - W) / 2);
 
 function boardText(w) {
   const x = BOARD_X + wallShift(w);
-  return {x0: x + 6, y0: BOARD_Y + 5, x1: x + BOARD_W - 6, y1: BOARD_Y + BOARD_H - 5};
+  // the text uses the whole slate, top to bottom
+  return {x0: x + 6, y0: BOARD_Y + 4, x1: x + BOARD_W - 6, y1: BOARD_Y + BOARD_H - 4};
 }
 
 // ------------------------------------------------------------ the scene's pieces
