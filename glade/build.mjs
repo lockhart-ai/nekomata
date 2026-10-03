@@ -31,8 +31,8 @@ export function themes() {
     .map((name) => name.slice(0, -3).split("-").slice(1).join("-")))].sort();
 }
 
-const THEME_LABELS = { halloween: "Halloween", christmas: "Christmas", spring: "Spring",
-  summer: "Summer", autumn: "Autumn" };
+const THEME_LABELS = { halloween: "Halloween", christmas: "Christmas", winter: "Winter",
+  spring: "Spring", summer: "Summer", autumn: "Autumn" };
 
 /**
  * The plugin's manifest.json, versioned with the extension. It asks for Glade's

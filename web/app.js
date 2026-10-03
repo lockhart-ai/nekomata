@@ -94,6 +94,7 @@ function useStyle(id) {
 // Each season is [theme, from month, from day, to month, to day], first match wins.
 const SEASONS = [
   ["christmas", 12, 1, 1, 6],
+  ["winter", 1, 7, 3, 19],
   ["halloween", 10, 15, 10, 31],
   ["autumn", 9, 22, 11, 30],
   ["spring", 3, 20, 5, 31],

@@ -122,7 +122,8 @@ describe("seasonal themes", () => {
     assert.equal(on("2026-11-15T12:00:00"), "autumn");
     assert.equal(on("2026-04-10T12:00:00"), "spring");
     assert.equal(on("2026-07-15T12:00:00"), "summer");
-    assert.equal(on("2026-02-14T12:00:00"), "none");
+    assert.equal(on("2027-02-14T12:00:00"), "winter");
+    assert.equal(on("2026-06-10T12:00:00"), "none");
   });
 
   for (const id of themes()) {
