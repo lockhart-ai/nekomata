@@ -92,8 +92,8 @@ describe("snapshot", () => {
 
   test("a cat is named by its task's title, or Glade's own name for an untitled one", () => {
     const model = fed(snapshot({ tasks: [task("t1", { title: "" }), task("t2", { title: "Fix flaky login" })] }));
-    assert.equal(cat(model, "t1").title, "New task");
-    assert.equal(cat(model, "t2").title, "Fix flaky login");
+    assert.equal(cat(model, "t1").title, "acme-api · New task");
+    assert.equal(cat(model, "t2").title, "acme-api · Fix flaky login");
     assert.equal(cat(model, "t1").project, "acme-api");
     assert.equal(cat(model, "t1").branch, "");
   });
@@ -216,7 +216,7 @@ describe("the machine: window, pastry case and espresso machine", () => {
 describe("tasks", () => {
   test("task.created brings a new cat, asleep until it works", () => {
     const model = fed(snapshot(), { type: "task.created", task: task("t1", { title: "" }) });
-    assert.equal(cat(model, "t1").title, "New task");
+    assert.equal(cat(model, "t1").title, "acme-api · New task");
     assert.equal(pose(cat(model, "t1")), "asleep");
   });
 
@@ -233,7 +233,7 @@ describe("tasks", () => {
     assert.equal(poseAfter({ activity: "error" }), "asleep");
     assert.equal(poseAfter({ activity: "waiting" }), "asleep");
     assert.equal(poseAfter({ title: "Renamed" }), "asleep");
-    assert.equal(cat(model, "t1").title, "Renamed");
+    assert.equal(cat(model, "t1").title, "acme-api · Renamed");
   });
 
   test("an update for a task it doesn't know is a new task (reopened, or a follow-up)", () => {
@@ -529,7 +529,7 @@ describe("the feed", () => {
     assert.deepEqual(cats(model).map((s) => s.id).sort(), ["t2", "t3"]);
     assert.deepEqual(kittens(model).map((s) => s.id), ["s2"]);
     assert.equal(pose(cat(model, "t2")), "paw");
-    assert.equal(cat(model, "t3").title, "Move uploads to S3");
+    assert.equal(cat(model, "t3").title, "acme-api · Move uploads to S3");
     assert.equal(statusText(model.scene(NOW)), "2 cats · 1 kitten");
   });
 
@@ -628,6 +628,26 @@ function fakeWindow() {
       listeners.forEach((listener) => listener({ data: { source: "glade", apiVersion: 1, seq: 1, event, ...envelope } })),
   };
 }
+
+describe("a cat's name", () => {
+  test("is its workspace, then its task", () => {
+    const model = fed(snapshot({ tasks: [task("t1", { workspaceName: "penny", title: "Land the eval ports" }),
+      task("t2", { workspaceName: "glade", title: "" })] }));
+    assert.equal(cat(model, "t1").title, "penny · Land the eval ports");
+    assert.equal(cat(model, "t2").title, "glade · New task");
+  });
+
+  test("is just the task when Glade gives no workspace name", () => {
+    const model = fed(snapshot({ tasks: [task("t1", { workspaceName: "", title: "Fix flaky login" })] }));
+    assert.equal(cat(model, "t1").title, "Fix flaky login");
+  });
+
+  test("follows a renamed workspace", () => {
+    const model = fed(snapshot({ tasks: [task("t1", { title: "Fix flaky login" })] }),
+      { type: "task.updated", task: task("t1", { workspaceName: "acme-web", title: "Fix flaky login" }) });
+    assert.equal(cat(model, "t1").title, "acme-web · Fix flaky login");
+  });
+});
 
 describe("the art style setting", () => {
   test("a Glade without plugin settings sends none, and the scene keeps its default", () => {

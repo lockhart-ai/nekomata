@@ -31,6 +31,12 @@
   const CAT_IDLE_WINDOW_MS = 15 * 60 * 1000;
   // Glade's own name for a task the agent hasn't named yet.
   const UNTITLED_TASK = "New task";
+
+  // A cat's name: its workspace, then its task's title (Glade's own name for an untitled one).
+  function catName(task) {
+    const title = task.title || UNTITLED_TASK;
+    return task.workspaceName ? `${task.workspaceName} · ${title}` : title;
+  }
   // An age app.js's sessionStatus reads as awake but not typing (45s–5m): the
   // cat sits up for a raised paw or a coffee break, without the typing bob.
   const AWAKE_SECONDS = 60;
@@ -257,7 +263,8 @@
       if (!events.length && task.status) events.push({time: now, tool: "say", detail: task.status});
       const session = {
         id: task.id, parent_id: "", project: task.workspaceName,
-        title: task.title || UNTITLED_TASK, branch: "", events,
+        // every workspace's tasks share the cafe, so a cat's name says whose it is
+        title: catName(task), branch: "", events,
         awaiting: "user", pending_tasks: 0, modified_at: ASLEEP, is_self: false,
       };
       const ask = openAsk(task.id);
