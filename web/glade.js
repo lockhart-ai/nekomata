@@ -421,6 +421,12 @@
     return {
       tick() { if (live) publish(); },
       isLive() { return live; },
+      // Asks Glade to show a task (and one of its subagents, for a kitten). Glade only
+      // does it right after a real click in the plugin's view, once per click, and an
+      // older Glade drops the message; either way there's nothing to do here if it won't.
+      open(taskId, subagentId) {
+        bridge.post({type: "openTask", taskId, subagentId: subagentId || null});
+      },
     };
   }
 

@@ -572,6 +572,7 @@ function renderOverlay(data) {
     pieces.push(`<div class="hover-target"` +
       ` style="left:${catBox.left}px;top:${catBox.top}px;` +
       `width:${catBoxEnd.left - catBox.left}px;height:${catBoxEnd.top - catBox.top}px"` +
+      ` data-task="${escapeHtml(session.id)}"` +
       ` data-name="${escapeHtml(sessionName(session))}"` +
       ` data-when="${escapeHtml(catHover.when)}"` +
       ` data-message="${escapeHtml(catHover.message)}"></div>`);
@@ -594,6 +595,7 @@ function renderOverlay(data) {
         ` style="left:${hoverBox.left}px;top:${hoverBox.top}px;` +
         `width:${hoverBoxEnd.left - hoverBox.left}px;` +
         `height:${hoverBoxEnd.top - hoverBox.top}px"` +
+        ` data-task="${escapeHtml(session.id)}" data-subagent="${escapeHtml(kitten.id)}"` +
         ` data-name="⑂ ${escapeHtml(kittenLabel(kitten))}"` +
         ` data-when="${escapeHtml(kittenHover.when)}"` +
         ` data-message="${escapeHtml(kittenHover.message)}"></div>`);
@@ -880,6 +882,15 @@ overlay.addEventListener("mouseover", (event) => {
   hovercard.style.left =
     Math.max(8, Math.min(window.innerWidth - cardWidth - 8, box.left)) + "px";
   hovercard.style.top = Math.max(8, box.top - hovercard.offsetHeight - 8) + "px";
+});
+// In Glade, clicking a cat opens its task, and a kitten its subagent in that task. The
+// overlay is rebuilt every second, so the element pressed may be gone by the release; the
+// release is what counts, on whichever cat is under the pointer then.
+overlay.addEventListener("pointerup", (event) => {
+  if (!gladeLink || event.button !== 0) return;
+  const target = event.target.closest(".hover-target");
+  if (target && target.dataset.task)
+    gladeLink.open(target.dataset.task, target.dataset.subagent || null);
 });
 overlay.addEventListener("mouseout", (event) => {
   if (event.target.closest(".hover-target")) hovercard.style.display = "none";
