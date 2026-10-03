@@ -304,7 +304,7 @@ function drawCat(g, spot, accent, pose, frame) {
     const top = py - 16 + (slow ? 0 : 1);
     sprite(g, CAT_HEAD, cx - 18, top, pal);
     sprite(g, FACES.shut.rows, cx - 18, top + FACES.shut.y + 1, pal);
-    if (theme.catOutfit) theme.catOutfit(g, {x: cx - 18, y: top, w: 22, asleep: true}, accent, frame);
+    if (theme.catOutfit) theme.catOutfit(g, {x: cx - 18, y: top, w: 22, asleep: true, seed: pose.seed || 0}, accent, frame);
     return;
   }
   const {startled, waiting, raisingHand} = pose;
@@ -330,7 +330,7 @@ function drawCat(g, spot, accent, pose, frame) {
   const sip = waiting && pose.sipping;
   const face = FACES[startled ? "wide" : sip ? "shut" : pose.blink ? "blink" : "open"];
   sprite(g, face.rows, x - 11 + look, hy + face.y, pal);
-  if (theme.catOutfit) theme.catOutfit(g, {x: x - 11, y: hy, w: 22, asleep: false, startled}, accent, frame);
+  if (theme.catOutfit) theme.catOutfit(g, {x: x - 11, y: hy, w: 22, asleep: false, startled, seed: pose.seed || 0}, accent, frame);
   if (pose.laptop) drawLaptop(laptopPen, cx, py, accent, pose.laptop, frame, pose.pending, pose.flash);
   // paws and the mug, in front of the laptop
   if (typing) {
@@ -1280,8 +1280,10 @@ const wallShift = (w) => Math.round((w - W) / 2);
 //                                          ((x, y) the pot's bottom-left); kittens still come
 //                                          over to swat at whatever stands there
 //   catOutfit(g, head, accent, frame)      worn by every cat, drawn over its head: head is
-//                                          {x, y, w, asleep, startled} for the 22-wide head's
-//                                          top-left (a startled cat's fur stands on end)
+//                                          {x, y, w, asleep, startled, seed} for the 22-wide
+//                                          head's top-left (a startled cat's fur stands on
+//                                          end); seed is a number fixed per cat, for choices
+//                                          like which side a hat sits on
 //   front(g, w, h, frame)                  drawn over the whole scene (falling snow, leaves)
 const THEMES = {};
 let theme = {};
