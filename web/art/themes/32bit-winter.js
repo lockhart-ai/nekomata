@@ -269,10 +269,8 @@ function plant(g, x, y, frame) {
 
 // ------------------------------------------------------------ the cats' bobble beanies
 // A beanie pulled down over the whole top of the head, its ribbed band just above the eyes,
-// in the yarn that stands out most from the cat's fur. The ears either poke out through holes
-// in it ("holes") or are knitted into it as little ear-shaped points ("knit"). A startled
-// cat's hat jumps.
-const EAR_STYLE = "holes";
+// in the yarn that stands out most from the cat's fur, with the ears knitted into it as
+// little ear-shaped points. A startled cat's hat jumps.
 const YARNS = ["#f2ead8", "#2e3e6e", "#e8b84a", "#d8e8f4", "#8a5aa8"];
 // rows from the head's top row - 4 (the bobble) to row 6, the band just above the eyes
 const BEANIE = [
@@ -288,7 +286,7 @@ const BEANIE = [
 "OrRrRrRrRrRrRrRrRrRrRO",
 "ORrRrRrRrRrRrRrRrRrRrO",
 ];
-// the ears standing up out of it (left over head columns 1-7, right over 14-20)
+// its knitted ears (left over head columns 1-7, right over 14-20)
 const EAR_L = ["..OO...", ".OLSO..", ".OSPSO.", "OLSPPSO", "OSPPPSO"];
 const EAR_R = ["...OO..", "..OSSO.", ".OSPDO.", "OSPPSDO", "OSPPPDO"];
 function distance(a, b) {
@@ -307,18 +305,9 @@ function catOutfit(g, head, accent, frame) {
   const inset = head.startled ? 1 : 0;
   const lx = head.x + 1 + inset, rx = head.x + 14 - inset;
   sprite(g, BEANIE, head.x, head.y - 4 - lift, pal);
-  if (EAR_STYLE === "knit") {
-    // the hat's own knitted ears, jumping with it
-    const knit = {O: pal.O, L: pal.l, S: pal.h, P: pal.d, D: pal.d};
-    sprite(g, EAR_L, lx, head.y - 1 - lift, knit);
-    sprite(g, EAR_R, rx, head.y - 1 - lift, knit);
-  } else {
-    // the cat's own ears through holes in the knit, the hole's edge round their base
-    const fur = art.kit.catPalette(accent);
-    sprite(g, EAR_L, lx, head.y - 1, fur);
-    sprite(g, EAR_R, rx, head.y - 1, fur);
-    g.rect(lx, head.y + 4 - lift, 7, 1, pal.d); g.rect(rx, head.y + 4 - lift, 7, 1, pal.d);
-  }
+  const knit = {O: pal.O, L: pal.l, S: pal.h, P: pal.d, D: pal.d};
+  sprite(g, EAR_L, lx, head.y - 1 - lift, knit);
+  sprite(g, EAR_R, rx, head.y - 1 - lift, knit);
 }
 
 // ------------------------------------------------------------ big soft flakes, slowly
