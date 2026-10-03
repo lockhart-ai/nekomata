@@ -208,6 +208,10 @@ function advanceKittenPlay(play, readings) {
   if (play.ballY > maxY) { play.ballY = maxY; play.ballVY = -Math.abs(play.ballVY); }
   if (play.errand) { runErrand(play, readings); return; }
   if (play.nextErrand === undefined) play.nextErrand = frame + between([15, 45]);
+  // the sun coming out is worth getting up for: a playing kitten heads for it soon after
+  const hot = readings.cpuLoad >= HOT_CPU;
+  if (hot && !play.sawSun) play.nextErrand = Math.min(play.nextErrand, frame + between([2, 15]));
+  play.sawSun = hot;
   if (frame >= play.nextErrand && Math.random() < 0.2) {
     play.errand = chooseErrand(play, readings);
     if (play.errand) return;
