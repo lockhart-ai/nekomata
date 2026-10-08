@@ -37,6 +37,14 @@
     const title = task.title || UNTITLED_TASK;
     return task.workspaceName ? `${task.workspaceName} · ${title}` : title;
   }
+  // A task's running watchers (its monitors and background commands), as
+  // glade#490 ships on the task: coffee for a turn that's over while they run,
+  // like one with subagents still out. A Glade from before it sends no field:
+  // read a missing one as 0.
+  function watchersOf(task) {
+    return Number.isFinite(task.watchers) ? Math.max(0, task.watchers) : 0;
+  }
+
   // An age app.js's sessionStatus reads as awake but not typing (45s–5m): the
   // cat sits up for a raised paw or a coffee break, without the typing bob.
   const AWAKE_SECONDS = 60;
@@ -283,10 +291,10 @@
         // a usage limit or offline: it resumes on its own, so coffee
         session.awaiting = "tool";
         session.modified_at = nowSeconds - AWAKE_SECONDS;
-      } else if (runningKittens > 0) {
-        // its turn is over but background subagents still run: coffee, with
-        // a dot per kitten still out
-        session.pending_tasks = runningKittens;
+      } else if (runningKittens + watchersOf(task) > 0) {
+        // its turn is over but background work still runs (kittens out, or
+        // monitors and background commands): coffee, with a dot each
+        session.pending_tasks = runningKittens + watchersOf(task);
         session.modified_at = nowSeconds - AWAKE_SECONDS;
       }
       // otherwise waiting on you, or its turn failed: asleep
@@ -326,12 +334,12 @@
       return latest;
     }
 
-    // Idle: not working, not paused, not asking you anything and no kitten
-    // still out. A task waiting on your reply counts too. It stays in the
-    // model, so its next event brings the cat back in.
+    // Idle: not working, not paused, not asking you anything, and no kitten
+    // or watcher still out. A task waiting on your reply counts too. It stays
+    // in the model, so its next event brings the cat back in.
     function goneIdle(task, runningKittens, nowMs) {
       if (task.activity === "working" || task.activity === "paused") return false;
-      if (task.waitingOn || openAsk(task.id) || runningKittens > 0) return false;
+      if (task.waitingOn || openAsk(task.id) || runningKittens + watchersOf(task) > 0) return false;
       return nowMs - lastActivityMs(task) > CAT_IDLE_WINDOW_MS;
     }
 
