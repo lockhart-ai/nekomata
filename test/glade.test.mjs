@@ -388,6 +388,24 @@ describe("subagents: the kittens", () => {
     model.handle({ type: "subagent.updated", subagent: subagent("s2", "t1", { state: "failed", endedAt: NOW }) });
     assert.equal(pose(cat(model, "t1")), "asleep");
   });
+
+  test("a waiting task with watchers still running sips coffee too, until they end", () => {
+    const model = fed(snapshot({ tasks: [task("t1", { watchers: 2 })] }));
+    assert.equal(pose(cat(model, "t1")), "coffee");
+    assert.equal(cat(model, "t1").pending_tasks, 2);
+    model.handle({ type: "task.updated", task: task("t1", { watchers: 0 }) });
+    assert.equal(pose(cat(model, "t1")), "asleep");
+  });
+
+  test("kittens and watchers count together; a Glade without the field reads as none", () => {
+    const model = fed(snapshot({
+      tasks: [task("t1", { watchers: 3 }), task("t2")],
+      subagents: [subagent("s1", "t1")],
+    }));
+    assert.equal(pose(cat(model, "t1")), "coffee");
+    assert.equal(cat(model, "t1").pending_tasks, 4);
+    assert.equal(pose(cat(model, "t2")), "asleep");
+  });
 });
 
 describe("questions and permission cards: the raised paw", () => {
@@ -454,14 +472,16 @@ describe("idle cats: gone after 15 minutes, back when busy", () => {
     assert.deepEqual(cats(model, later), []);
   });
 
-  test("working, paused, asking a question or waiting on a permission card: it stays however long", () => {
+  test("working, paused, asking a question, waiting on a permission card, or with a watcher out: it stays however long", () => {
     const model = fed(snapshot({
       tasks: [stale("t1", { activity: "working" }), stale("t2", { activity: "paused" }),
-        stale("t3", { waitingOn: "question" }), stale("t4"), stale("t5"), stale("t6")],
+        stale("t3", { waitingOn: "question" }), stale("t4"), stale("t5"), stale("t6"),
+        stale("t7", { watchers: 1 })],
       questions: [question("t4", "q1")], permissions: [permission("t5", "p1")],
     }));
     const later = NOW + 24 * 3_600_000;
-    assert.deepEqual(cats(model, later).map((s) => s.id).sort(), ["t1", "t2", "t3", "t4", "t5"]);
+    assert.deepEqual(cats(model, later).map((s) => s.id).sort(),
+      ["t1", "t2", "t3", "t4", "t5", "t7"]);
   });
 
   test("a task with a kitten still out stays; one that's finished keeps it in for the window", () => {
