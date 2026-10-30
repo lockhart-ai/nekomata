@@ -1140,9 +1140,15 @@ document.addEventListener("keydown", (event) => {
     if (key && HINT_KEYS.includes(key)) { event.preventDefault(); activateHint(key); }
     return;
   }
+  // f, arrows, Enter/Space and this Escape only ever act once focus arrived by keyboard
+  // (Tab, native, gets it there, or our own roving move/hint jump): never on a page — or
+  // VS Code webview host — that happens to share a key with ours, and never for a mouse
+  // user, whose click also focuses the target (it has a tabindex) but must change nothing
+  // else about what pressing a key afterwards does.
+  const inGroup = keyboardFocusedOn(rovingId);
   const dirMap = {ArrowRight: "right", ArrowLeft: "left", ArrowUp: "up", ArrowDown: "down"};
-  if (overlayHasFocus && dirMap[event.key]) { event.preventDefault(); rovingMove(dirMap[event.key]); return; }
-  if (overlayHasFocus && (event.key === "Enter" || event.key === " ")) {
+  if (inGroup && dirMap[event.key]) { event.preventDefault(); rovingMove(dirMap[event.key]); return; }
+  if (inGroup && (event.key === "Enter" || event.key === " ")) {
     event.preventDefault();
     const current = hoverTargetBySid.get(rovingId);
     // Same path as a click (gladeLink.open), and Glade accepts it after this real keydown
@@ -1150,15 +1156,13 @@ document.addEventListener("keydown", (event) => {
     if (current && gladeLink) gladeLink.open(current.dataset.task, current.dataset.subagent || null);
     return;
   }
-  // f, arrows, Enter/Space and this Escape only ever act with focus already in the group
-  // (Tab, native, gets it there): never on a page — or VS Code webview host — that happens
-  // to share a key with ours, and never for a mouse-only user, who never presses any of them.
-  if (overlayHasFocus && event.key.toLowerCase() === "f" &&
+  // Hint mode itself is therefore only ever entered from a keyboard focus too.
+  if (inGroup && event.key.toLowerCase() === "f" &&
       !event.ctrlKey && !event.metaKey && !event.altKey) {
     event.preventDefault();
     showHints();
   }
-  if (overlayHasFocus && event.key === "Escape") {
+  if (inGroup && event.key === "Escape") {
     event.preventDefault();
     const current = hoverTargetBySid.get(rovingId);
     if (current) current.blur();

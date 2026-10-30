@@ -18,16 +18,20 @@ function tabTo(scene, sid) {
   scene.evaluate(`hoverTargetBySid.get(${JSON.stringify(sid)}).focus()`);
 }
 
+// A click: pointerdown then focus() with no preceding Tab keydown — pointer-origin, as a
+// real click on a target with a tabindex (it has one, for Tab to reach it) would look.
+function mouseFocusOn(scene, sid) {
+  const target = scene.evaluate(`hoverTargetBySid.get(${JSON.stringify(sid)})`);
+  target.dispatchEvent("pointerdown");
+  target.focus();
+  return target;
+}
+
 describe("keyboard navigation", () => {
   test("Tab (a keyboard focus) sets the roving target and the pixel outline; a mouse click does neither", async () => {
     const scene = loadScene({ scripts: sceneScripts(), snapshot: cafeRun });
     await scene.frame();
-    const target = scene.evaluate(`hoverTargetBySid.get(${JSON.stringify(FIRST_CAT)})`);
-
-    // A click: focus() with no preceding Tab keydown — pointer-origin, as a real click's
-    // mousedown-then-focus would look to our code.
-    target.dispatchEvent("pointerdown");
-    target.focus();
+    const target = mouseFocusOn(scene, FIRST_CAT);
     assert.equal(scene.evaluate("overlayHasFocus"), true);     // focus did land…
     assert.equal(scene.evaluate("keyboardFocused"), false);    // …but not by keyboard
     assert.equal(scene.evaluate(`keyboardFocusedOn(${JSON.stringify(FIRST_CAT)})`), false);
@@ -138,6 +142,25 @@ describe("keyboard activation in Glade", () => {
     scene.keydown({ key: " " });
     assert.deepEqual(posted(scene).filter((m) => m.type === "openTask"),
       [{ type: "openTask", taskId: FIRST_CAT, subagentId: "agent-kit-1" }]);
+  });
+
+  test("a mouse focus on a cat does not turn on keyboard controls: arrows, Enter, Space, f and Escape do nothing", async () => {
+    const scene = gladeScene();
+    await scene.frame();
+    mouseFocusOn(scene, FIRST_CAT);
+    assert.equal(scene.evaluate("overlayHasFocus"), true);    // the click did focus it…
+    assert.equal(scene.evaluate("keyboardFocused"), false);   // …but not by keyboard
+
+    assert.equal(scene.keydown({ key: "ArrowRight" }).defaultPrevented, false);
+    assert.equal(scene.evaluate("rovingId"), FIRST_CAT);       // focus didn't move
+    assert.equal(scene.keydown({ key: "Enter" }).defaultPrevented, false);
+    assert.equal(scene.keydown({ key: " " }).defaultPrevented, false);
+    assert.equal(scene.keydown({ key: "f" }).defaultPrevented, false);
+    assert.equal(scene.evaluate("hintsActive"), false);        // no hints appeared
+    assert.equal(scene.keydown({ key: "Escape" }).defaultPrevented, false);
+    assert.equal(scene.evaluate("overlayHasFocus"), true);     // Escape didn't blur it either
+
+    assert.deepEqual(posted(scene).filter((m) => m.type === "openTask"), []);
   });
 
   test("a mouse click still opens the task on pointerup, untouched by any of this", async () => {
