@@ -740,7 +740,10 @@ function syncHoverTarget(sid, info) {
   el.style.top = info.box.top + "px";
   el.style.width = info.box.width + "px";
   el.style.height = info.box.height + "px";
-  el.setAttribute("role", "button");
+  // role="button" only where Enter/Space (and a click) actually open something: inside
+  // Glade. Outside it, a click does nothing either, so claiming button semantics would be
+  // a false promise to a screen reader.
+  el.setAttribute("role", gladeFeed ? "button" : "group");
   el.setAttribute("aria-label", info.name);
   el.dataset.sid = sid;
   el.dataset.task = info.task;
@@ -1117,6 +1120,14 @@ document.addEventListener("keydown", (event) => {
   }
   const dirMap = {ArrowRight: "right", ArrowLeft: "left", ArrowUp: "up", ArrowDown: "down"};
   if (overlayHasFocus && dirMap[event.key]) { event.preventDefault(); rovingMove(dirMap[event.key]); return; }
+  if (overlayHasFocus && (event.key === "Enter" || event.key === " ")) {
+    event.preventDefault();
+    const current = hoverTargetBySid.get(rovingId);
+    // Same path as a click (gladeLink.open), and Glade accepts it after this real keydown
+    // gesture too; outside Glade (gladeLink null) there's nothing to open, as with a click.
+    if (current && gladeLink) gladeLink.open(current.dataset.task, current.dataset.subagent || null);
+    return;
+  }
   // f jumps into the group with a letter hint on each target — not while already in it.
   if (event.key.toLowerCase() === "f" && !event.ctrlKey && !event.metaKey && !event.altKey &&
       !overlayHasFocus) {
