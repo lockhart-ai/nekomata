@@ -1107,10 +1107,12 @@ document.addEventListener("keydown", (event) => {
   const eventTarget = event.target;
   if (eventTarget && (eventTarget.tagName === "INPUT" || eventTarget.tagName === "TEXTAREA")) return;
   if (hintsActive) {
-    event.preventDefault();
-    if (event.key === "Escape") { dismissHints(); return; }
+    // Only Escape or an actual hint letter is ours to take: Tab, a modifier shortcut
+    // (Cmd/Ctrl/Alt) and anything else passes through untouched.
+    if (event.key === "Escape") { event.preventDefault(); dismissHints(); return; }
+    if (event.ctrlKey || event.metaKey || event.altKey || event.key === "Tab") return;
     const key = event.key.length === 1 ? event.key.toLowerCase() : "";
-    if (key && HINT_KEYS.includes(key)) activateHint(key);
+    if (key && HINT_KEYS.includes(key)) { event.preventDefault(); activateHint(key); }
     return;
   }
   const dirMap = {ArrowRight: "right", ArrowLeft: "left", ArrowUp: "up", ArrowDown: "down"};
