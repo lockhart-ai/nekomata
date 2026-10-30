@@ -45,6 +45,44 @@ function sizeCanvases(width, height) {
   for (const layer of [canvas, actorsCanvas]) { layer.width = width; layer.height = height; }
 }
 
+// ------------------------------------------------------------ keyboard focus outline
+// A style (web/art/*.js) draws a cat as several solid-colour rects through `pen`/`g`; a
+// turned cat's rects still go through the same pen object (mirrored() just redirects the
+// coordinates, see 16bit.js/32bit.js), so wrapping pen.rect here sees every style's cat and
+// kitten, turned or not, with no changes to web/art/*.js at all.
+function isTranslucent(color) {
+  const match = /^rgba\([^)]*,\s*([\d.]+)\s*\)$/.exec(color);
+  return !!match && Number(match[1]) < 1;
+}
+
+/** Runs `draw` recording every pixel it fills (skipping soft/translucent fills, like a
+ *  shadow, so the outline hugs the sprite and not a shadow's blur), then traces a 1px white
+ *  contour around that silhouette on the same layer draw used — the focused cat's outline. */
+function withFocusOutline(draw) {
+  const cells = new Set();
+  const plain = pen.rect;
+  pen.rect = function (x, y, w, h, color) {
+    plain.call(pen, x, y, w, h, color);
+    if (isTranslucent(color)) return;
+    const x0 = Math.floor(x), y0 = Math.floor(y), x1 = Math.ceil(x + w), y1 = Math.ceil(y + h);
+    for (let yy = y0; yy < y1; yy++)
+      for (let xx = x0; xx < x1; xx++) cells.add(xx + "," + yy);
+  };
+  try { draw(); } finally { pen.rect = plain; }
+  pen.layer.fillStyle = "#fffdf7";
+  for (const key of cells) {
+    const at = key.indexOf(",");
+    const x = Number(key.slice(0, at)), y = Number(key.slice(at + 1));
+    if (!cells.has((x - 1) + "," + y)) pen.layer.fillRect(x - 1, y, 1, 1);
+    if (!cells.has((x + 1) + "," + y)) pen.layer.fillRect(x + 1, y, 1, 1);
+    if (!cells.has(x + "," + (y - 1))) pen.layer.fillRect(x, y - 1, 1, 1);
+    if (!cells.has(x + "," + (y + 1))) pen.layer.fillRect(x, y + 1, 1, 1);
+  }
+}
+
+// Whether `id` (a session or kitten id) should be drawn with the outline right now.
+function focusedThis(id) { return overlayHasFocus && rovingId === id; }
+
 function fitSceneToViewport() {
   // Widen the scene to the viewport's aspect ratio; the style lays its room
   // out for whatever width it's given.
@@ -60,6 +98,10 @@ function fitSceneToViewport() {
   return true;
 }
 const overlay = document.getElementById("overlay");
+// The keyboard/hover targets live in their own sibling layer, not inside #overlay: that one
+// is rebuilt (innerHTML) every second for the bubbles and nametags, which would tear down
+// and recreate a focused target each time — exactly what loses screen-reader focus.
+const hoverTargets = document.getElementById("hover-targets");
 // Inside Glade, web/glade.js is inlined ahead of this script and the scene is
 // fed by Glade's plugin events instead of the server: no /data, no client log.
 const gladeFeed = typeof NekomataGlade === "object" ? NekomataGlade : null;
@@ -74,6 +116,17 @@ let knownCatInfo = null;
 // idle kittens free-roam and play fetch-with-themselves: whack the yarn ball,
 // chase it, whack it again. kitten id → play state.
 const kittenPlay = new Map();
+
+// ------------------------------------------------------------ keyboard navigation
+// Session/kitten id → its persistent hover-target element (see hoverTargets above): the
+// same node for as long as that cat/kitten is on the floor, so focusing it never looks like
+// a new element to a screen reader.
+const hoverTargetBySid = new Map();
+let rovingId = null;          // which id owns tabindex="0" (WAI-ARIA roving tabindex)
+let overlayHasFocus = false;  // a hover-target has focus
+const HINT_KEYS = "asdfghjklqwertyuiopzxcvbnm";
+let hintsActive = false;
+let hintContainer = null;
 
 function useStyle(id) {
   // An id this build doesn't have (a newer setting, a typo) keeps the style in use.
@@ -95,6 +148,10 @@ function useStyle(id) {
   adoptionRuns = [];
   hiddenCatIds.clear();
   knownCatInfo = null;
+  for (const el of hoverTargetBySid.values()) el.remove();
+  hoverTargetBySid.clear();
+  rovingId = null; overlayHasFocus = false;
+  dismissHints();
   return true;
 }
 
@@ -282,7 +339,7 @@ function kittenLabel(kitten) {
   return "⑂ " + kitten.id.replace(/^agent-/, "").slice(0, 7);
 }
 
-function drawAdoptionRuns() {
+function drawAdoptionRuns(advance) {
   // Departing cats wait asleep on their tree until the man collects them —
   // the tree only vanishes once the cat is in his arms.
   for (const waiting of adoptionRuns) {
@@ -299,21 +356,25 @@ function drawAdoptionRuns() {
   const speed = 20 / UNIT;
   const offstage = 40 / UNIT;
   if (run.x === null) run.x = run.type === "arrive" ? -offstage : sceneW + offstage;
-  if (run.phase === "in") {
-    run.x += run.type === "arrive" ? speed : -speed;
-    const reached = run.type === "arrive" ? run.x >= run.targetX
-                                          : run.x <= run.targetX;
-    if (reached) {
-      run.x = run.targetX;
-      run.phase = "out";
-      if (run.type === "arrive") hiddenCatIds.delete(run.id);
-    }
-  } else {
-    run.x += run.type === "arrive" ? -speed : speed;
-    if (run.x < -60 / UNIT || run.x > sceneW + 60 / UNIT) {
-      if (run.type === "arrive") hiddenCatIds.delete(run.id);
-      adoptionRuns.shift();
-      return;
+  // A keyboard-only repaint (advance=false) must not step the ceremony along — it just
+  // redraws the man at wherever he already is this frame.
+  if (advance) {
+    if (run.phase === "in") {
+      run.x += run.type === "arrive" ? speed : -speed;
+      const reached = run.type === "arrive" ? run.x >= run.targetX
+                                            : run.x <= run.targetX;
+      if (reached) {
+        run.x = run.targetX;
+        run.phase = "out";
+        if (run.type === "arrive") hiddenCatIds.delete(run.id);
+      }
+    } else {
+      run.x += run.type === "arrive" ? -speed : speed;
+      if (run.x < -60 / UNIT || run.x > sceneW + 60 / UNIT) {
+        if (run.type === "arrive") hiddenCatIds.delete(run.id);
+        adoptionRuns.shift();
+        return;
+      }
     }
   }
   const carrying = run.type === "arrive" ? run.phase === "in"
@@ -363,7 +424,7 @@ function drawSpotWithCat(slot, session, now, workingKittens) {
   previousPendingById.set(session.id, session.pending_tasks);
   const seed = seedFor(session.id);
   const settled = status !== "idle" && !startled;
-  ART.drawCat(pen, spot, accent, {
+  const drawCat = () => ART.drawCat(pen, spot, accent, {
     status, startled, waiting, raisingHand,
     blink: settled && (frame + seed) % 13 === 0,       // blink ~every 4s
     // never turn away while waiting
@@ -379,6 +440,7 @@ function drawSpotWithCat(slot, session, now, workingKittens) {
     // the same number for this cat every time, for whatever a style picks per cat
     seed,
   }, frame);
+  if (focusedThis(session.id)) withFocusOutline(drawCat); else drawCat();
 }
 
 function workingKittensOf(data, sessionId) {
@@ -386,7 +448,7 @@ function workingKittensOf(data, sessionId) {
     sessionStatus(kitten, data.generated_at) === "working").length;
 }
 
-function drawScene() {
+function drawScene(advance = true) {
   context.clearRect(0, 0, sceneW, sceneH);
   actorsContext.clearRect(0, 0, sceneW, sceneH);
   pen.layer = context;
@@ -420,7 +482,8 @@ function drawScene() {
       const yarnColor = KITTEN_YARN_COLORS[index % KITTEN_YARN_COLORS.length];
       if (working) {
         kittenPlay.delete(kitten.id);
-        ART.drawKittenWorking(pen, place, accent, frame, index, yarnColor);
+        const draw = () => ART.drawKittenWorking(pen, place, accent, frame, index, yarnColor);
+        if (focusedThis(kitten.id)) withFocusOutline(draw); else draw();
       } else {
         let play = kittenPlay.get(kitten.id);
         if (!play) {
@@ -429,12 +492,15 @@ function drawScene() {
                   ballVX: 0, ballVY: 0};
           kittenPlay.set(kitten.id, play);
         }
-        advanceKittenPlay(play, readings);
-        ART.drawKittenPlaying(pen, play, accent, frame, yarnColor);
+        // A keyboard-only repaint (advance=false) must not step the kitten's play along —
+        // it just redraws it at wherever it already is this frame.
+        if (advance) advanceKittenPlay(play, readings);
+        const draw = () => ART.drawKittenPlaying(pen, play, accent, frame, yarnColor);
+        if (focusedThis(kitten.id)) withFocusOutline(draw); else draw();
       }
     });
   }
-  drawAdoptionRuns();
+  drawAdoptionRuns(advance);
   if (ART.drawForeground) ART.drawForeground(pen, sceneW, frame);
 }
 
@@ -551,6 +617,7 @@ function renderOverlay(data) {
     `max-width:${Math.max(80, Math.min(170, bandScreen))}px;`;
   const nameFont = `font-size:${Math.max(8, Math.min(12, 11 * textScale)).toFixed(1)}px;`;
   const pieces = [];
+  const seenSids = new Set();
   for (const session of data.sessions) {
     const slot = spotBySession.get(session.id);
     if (slot === undefined || hiddenCatIds.has(session.id)) continue;
@@ -569,13 +636,13 @@ function renderOverlay(data) {
     const catHover = hoverData(session, now);
     const catBox = scenePosition(anchors.hover.x0, anchors.hover.y0);
     const catBoxEnd = scenePosition(anchors.hover.x1, anchors.hover.y1);
-    pieces.push(`<div class="hover-target"` +
-      ` style="left:${catBox.left}px;top:${catBox.top}px;` +
-      `width:${catBoxEnd.left - catBox.left}px;height:${catBoxEnd.top - catBox.top}px"` +
-      ` data-task="${escapeHtml(session.id)}"` +
-      ` data-name="${escapeHtml(sessionName(session))}"` +
-      ` data-when="${escapeHtml(catHover.when)}"` +
-      ` data-message="${escapeHtml(catHover.message)}"></div>`);
+    syncHoverTarget(session.id, {
+      task: session.id, subagent: null, name: sessionName(session),
+      when: catHover.when, message: catHover.message,
+      box: {left: catBox.left, top: catBox.top,
+            width: catBoxEnd.left - catBox.left, height: catBoxEnd.top - catBox.top},
+    });
+    seenSids.add(session.id);
     pieces.push(`<div class="nametag"` +
       ` style="left:${namePosition.left}px;top:${namePosition.top}px;${nameFont}">` +
       `${escapeHtml(sessionName(session))}` +
@@ -591,14 +658,13 @@ function renderOverlay(data) {
       const kittenHover = hoverData(kitten, now);
       const hoverBox = scenePosition(kittenBox.x0, kittenBox.y0);
       const hoverBoxEnd = scenePosition(kittenBox.x1, kittenBox.y1);
-      pieces.push(`<div class="hover-target"` +
-        ` style="left:${hoverBox.left}px;top:${hoverBox.top}px;` +
-        `width:${hoverBoxEnd.left - hoverBox.left}px;` +
-        `height:${hoverBoxEnd.top - hoverBox.top}px"` +
-        ` data-task="${escapeHtml(session.id)}" data-subagent="${escapeHtml(kitten.id)}"` +
-        ` data-name="⑂ ${escapeHtml(kittenLabel(kitten))}"` +
-        ` data-when="${escapeHtml(kittenHover.when)}"` +
-        ` data-message="${escapeHtml(kittenHover.message)}"></div>`);
+      syncHoverTarget(kitten.id, {
+        task: session.id, subagent: kitten.id, name: "⑂ " + kittenLabel(kitten),
+        when: kittenHover.when, message: kittenHover.message,
+        box: {left: hoverBox.left, top: hoverBox.top,
+              width: hoverBoxEnd.left - hoverBox.left, height: hoverBoxEnd.top - hoverBox.top},
+      });
+      seenSids.add(kitten.id);
       if (!working) return;
       const kittenContent = bubbleContentFor(kitten, "working", now);
       if (kittenContent) {
@@ -633,6 +699,15 @@ function renderOverlay(data) {
   overlay.innerHTML = pieces.join("");
   clampBubblesToView();
   resolveBubbleCollisions();
+  // A cat/kitten that left the floor (adopted out, or its parent gone) loses its target —
+  // real focus loss, not the per-second kind this layer exists to avoid.
+  for (const [sid, el] of hoverTargetBySid)
+    if (!seenSids.has(sid)) {
+      el.remove();
+      hoverTargetBySid.delete(sid);
+      if (rovingId === sid) { rovingId = null; overlayHasFocus = false; }
+    }
+  applyRovingTabindex();
 }
 
 function clampBubblesToView() {
@@ -645,6 +720,117 @@ function clampBubblesToView() {
       bubble.style.left =
         (parseFloat(bubble.style.left) - (box.right - viewWidth + 2)) + "px";
   }
+}
+
+// ------------------------------------------------------------ keyboard/hover targets
+// Gets (or makes) sid's persistent hover-target element and brings its position and content
+// up to date in place — never recreated while the cat/kitten is on the floor, so a focused
+// one keeps the same element across every per-second rebuild (see #hover-targets in
+// styles.css).
+function syncHoverTarget(sid, info) {
+  let el = hoverTargetBySid.get(sid);
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "hover-target";
+    el.setAttribute("tabindex", "-1");
+    hoverTargets.appendChild(el);
+    hoverTargetBySid.set(sid, el);
+  }
+  el.style.left = info.box.left + "px";
+  el.style.top = info.box.top + "px";
+  el.style.width = info.box.width + "px";
+  el.style.height = info.box.height + "px";
+  el.setAttribute("role", "button");
+  el.setAttribute("aria-label", info.name);
+  el.dataset.sid = sid;
+  el.dataset.task = info.task;
+  if (info.subagent) el.dataset.subagent = info.subagent; else delete el.dataset.subagent;
+  el.dataset.name = info.name;
+  el.dataset.when = info.when;
+  el.dataset.message = info.message;
+}
+
+// WAI-ARIA roving tabindex: exactly one hover-target is a Tab stop at a time, so the whole
+// group is a single stop; arrow keys move which one that is.
+function applyRovingTabindex() {
+  const targets = [...hoverTargetBySid.values()];
+  if (!targets.length) { rovingId = null; return; }
+  let found = false;
+  for (const el of targets) {
+    if (el.dataset.sid === rovingId) { el.setAttribute("tabindex", "0"); found = true; }
+    else el.setAttribute("tabindex", "-1");
+  }
+  if (!found) {
+    targets[0].setAttribute("tabindex", "0");
+    rovingId = targets[0].dataset.sid;
+  }
+}
+
+function centerOf(el) {
+  const box = el.getBoundingClientRect();
+  return {x: box.left + box.width / 2, y: box.top + box.height / 2};
+}
+
+// Moves the roving target to whichever other one is nearest in `direction` on screen (not
+// DOM order), penalizing cross-axis distance so a slightly-staggered row still feels like a
+// straight line. Focusing it is what actually moves rovingId/tabindex along — see focusin.
+function rovingMove(direction) {
+  const current = hoverTargetBySid.get(rovingId);
+  if (!current) return;
+  const origin = centerOf(current);
+  let best = null, bestDist = Infinity;
+  for (const el of hoverTargetBySid.values()) {
+    if (el === current) continue;
+    const c = centerOf(el);
+    const dx = c.x - origin.x, dy = c.y - origin.y;
+    let inDirection = false;
+    if (direction === "left") inDirection = dx < -8;
+    if (direction === "right") inDirection = dx > 8;
+    if (direction === "up") inDirection = dy < -8;
+    if (direction === "down") inDirection = dy > 8;
+    if (!inDirection) continue;
+    const primary = (direction === "left" || direction === "right") ? Math.abs(dx) : Math.abs(dy);
+    const cross = (direction === "left" || direction === "right") ? Math.abs(dy) : Math.abs(dx);
+    const dist = primary + cross * 2;
+    if (dist < bestDist) { bestDist = dist; best = el; }
+  }
+  if (!best) return;
+  best.focus({preventScroll: true});
+}
+
+// ------------------------------------------------------------ vimium-style hints
+function refreshHints() {
+  if (hintContainer) { hintContainer.remove(); hintContainer = null; }
+  if (!hintsActive) return;
+  const targets = [...hoverTargetBySid.values()];
+  if (!targets.length) { hintsActive = false; return; }
+  hintContainer = document.createElement("div");
+  hintContainer.id = "hint-overlay";
+  hintContainer.setAttribute("aria-live", "polite");
+  hintContainer.setAttribute("aria-label", "Keyboard hints active. Press a letter to jump to a cat.");
+  hoverTargets.appendChild(hintContainer);   // position:fixed — the parent doesn't matter
+  targets.forEach((target, i) => {
+    if (i >= HINT_KEYS.length) return;
+    const key = HINT_KEYS[i];
+    const box = target.getBoundingClientRect();
+    const hint = document.createElement("span");
+    hint.className = "hint-badge";
+    hint.textContent = key.toUpperCase();
+    hint.style.left = (box.left + box.width / 2) + "px";
+    hint.style.top = (box.top + box.height / 2) + "px";
+    hintContainer.appendChild(hint);
+  });
+}
+
+function showHints() { hintsActive = true; refreshHints(); }
+function dismissHints() { hintsActive = false; refreshHints(); }
+
+function activateHint(key) {
+  const targets = [...hoverTargetBySid.values()];
+  const index = HINT_KEYS.indexOf(key);
+  if (index < 0 || index >= targets.length) return;
+  dismissHints();
+  targets[index].focus({preventScroll: true});
 }
 
 // ------------------------------------------------------------ main loops
@@ -867,11 +1053,9 @@ document.addEventListener("visibilitychange", () => {
 // Low-frequency backstop in case rAF is ever suspended while still visible.
 setInterval(() => { if (gladeLink) gladeLink.tick(); else refresh(); }, 10000);
 
-// Hover a cat or kitten to see its full last message.
+// Hover, or keyboard-focus, a cat or kitten to see its full last message.
 const hovercard = document.getElementById("hovercard");
-overlay.addEventListener("mouseover", (event) => {
-  const target = event.target.closest(".hover-target");
-  if (!target) return;
+function showHovercard(target) {
   hovercard.innerHTML =
     `<span class="who">${escapeHtml(target.dataset.name)}</span>` +
     `<span class="when">${escapeHtml(target.dataset.when)}</span><br>` +
@@ -882,16 +1066,64 @@ overlay.addEventListener("mouseover", (event) => {
   hovercard.style.left =
     Math.max(8, Math.min(window.innerWidth - cardWidth - 8, box.left)) + "px";
   hovercard.style.top = Math.max(8, box.top - hovercard.offsetHeight - 8) + "px";
+}
+// The hover-target elements are now the keyboard/hover layer's own children (see
+// #hover-targets), not #overlay's — these are the same listeners, just moved to where the
+// targets live; mouse behaviour (what fires, and when) is unchanged.
+hoverTargets.addEventListener("mouseover", (event) => {
+  const target = event.target.closest(".hover-target");
+  if (target) showHovercard(target);
 });
 // In Glade, clicking a cat opens its task, and a kitten its subagent in that task. The
 // overlay is rebuilt every second, so the element pressed may be gone by the release; the
 // release is what counts, on whichever cat is under the pointer then.
-overlay.addEventListener("pointerup", (event) => {
+hoverTargets.addEventListener("pointerup", (event) => {
   if (!gladeLink || event.button !== 0) return;
   const target = event.target.closest(".hover-target");
   if (target && target.dataset.task)
     gladeLink.open(target.dataset.task, target.dataset.subagent || null);
 });
-overlay.addEventListener("mouseout", (event) => {
+hoverTargets.addEventListener("mouseout", (event) => {
   if (event.target.closest(".hover-target")) hovercard.style.display = "none";
+});
+
+// ------------------------------------------------------------ keyboard navigation
+hoverTargets.addEventListener("focusin", (event) => {
+  const el = event.target;
+  if (!el || !el.dataset || !el.dataset.sid) return;
+  rovingId = el.dataset.sid;
+  overlayHasFocus = true;
+  applyRovingTabindex();
+  showHovercard(el);
+  drawScene();
+});
+hoverTargets.addEventListener("focusout", () => {
+  overlayHasFocus = false;
+  hovercard.style.display = "none";
+  drawScene();
+});
+
+document.addEventListener("keydown", (event) => {
+  const eventTarget = event.target;
+  if (eventTarget && (eventTarget.tagName === "INPUT" || eventTarget.tagName === "TEXTAREA")) return;
+  if (hintsActive) {
+    event.preventDefault();
+    if (event.key === "Escape") { dismissHints(); return; }
+    const key = event.key.length === 1 ? event.key.toLowerCase() : "";
+    if (key && HINT_KEYS.includes(key)) activateHint(key);
+    return;
+  }
+  const dirMap = {ArrowRight: "right", ArrowLeft: "left", ArrowUp: "up", ArrowDown: "down"};
+  if (overlayHasFocus && dirMap[event.key]) { event.preventDefault(); rovingMove(dirMap[event.key]); return; }
+  // f jumps into the group with a letter hint on each target — not while already in it.
+  if (event.key.toLowerCase() === "f" && !event.ctrlKey && !event.metaKey && !event.altKey &&
+      !overlayHasFocus) {
+    event.preventDefault();
+    showHints();
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    const current = hoverTargetBySid.get(rovingId);
+    if (current) current.blur();
+  }
 });
