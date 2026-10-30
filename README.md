@@ -123,6 +123,10 @@ them to the page directly, so no server or Python is involved:
 - Marking a task done (or deleting it) sends the adoption man to carry its cat out.
 - **Clicking a cat opens its task** in Glade, switching workspace if it lives in another;
   clicking a kitten opens its task on that subagent's log.
+- The cafe is keyboard-navigable: **Tab** into it, **arrow keys** move between cats and
+  kittens spatially, **f** shows a letter hint on each one (type the letter to jump there),
+  and **Escape** dismisses the hints or leaves the group. **Enter**/**Space** opens the
+  focused one's task in Glade, the same as a click.
 - The window, the pastry case and the espresso machine follow your Mac's load once you let
   them: Nekomata asks for Glade's `machine` capability, which shows under it in
   **Settings › Plugins** as **Can see your Mac's CPU, GPU and Docker load**, off until you

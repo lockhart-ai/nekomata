@@ -150,7 +150,9 @@ describe("clicking a cat", () => {
   test("every cat and kitten's hover target names its task, and a kitten its subagent", async () => {
     const scene = loadScene({ scripts: sceneScripts(), snapshot: cafeRun });
     await scene.frame();
-    const html = scene.elements.overlay.innerHTML;
+    // The hover/keyboard targets live in their own layer now (#hover-targets), not #overlay:
+    // see test/keyboard.test.mjs for why (a focused one must never be torn down and rebuilt).
+    const html = scene.elements["hover-targets"].innerHTML;
     assert.match(html, /class="hover-target"[^>]* data-task="run-working-a3" data-name=/);
     assert.match(html, /class="hover-target"[^>]* data-task="run-working-a3" data-subagent="agent-kit-1"/);
   });
