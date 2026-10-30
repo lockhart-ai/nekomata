@@ -80,8 +80,10 @@ function withFocusOutline(draw) {
   }
 }
 
-// Whether `id` (a session or kitten id) should be drawn with the outline right now.
-function focusedThis(id) { return overlayHasFocus && rovingId === id; }
+// Whether `id` (a session or kitten id) should be drawn with the outline right now: only a
+// keyboard-driven focus does — a mouse click focuses the target too, but must draw nothing
+// extra, so a mouse-only user sees exactly what main draws.
+function keyboardFocusedOn(id) { return overlayHasFocus && keyboardFocused && rovingId === id; }
 
 function fitSceneToViewport() {
   // Widen the scene to the viewport's aspect ratio; the style lays its room
@@ -123,7 +125,12 @@ const kittenPlay = new Map();
 // a new element to a screen reader.
 const hoverTargetBySid = new Map();
 let rovingId = null;          // which id owns tabindex="0" (WAI-ARIA roving tabindex)
-let overlayHasFocus = false;  // a hover-target has focus
+let overlayHasFocus = false;  // a hover-target has focus, by mouse or keyboard
+// Only a keyboard-driven focus gets the pixel outline and the hovercard-on-focus: a mouse
+// click must look exactly as it does on main. Set from a Tab keydown (or our own roving
+// move) just ahead of the focus it causes, and read (then cleared) the moment focus lands.
+let keyboardFocusPending = false;
+let keyboardFocused = false;
 const HINT_KEYS = "asdfghjklqwertyuiopzxcvbnm";
 let hintsActive = false;
 let hintContainer = null;
@@ -150,7 +157,7 @@ function useStyle(id) {
   knownCatInfo = null;
   for (const el of hoverTargetBySid.values()) el.remove();
   hoverTargetBySid.clear();
-  rovingId = null; overlayHasFocus = false;
+  rovingId = null; overlayHasFocus = false; keyboardFocused = false; keyboardFocusPending = false;
   dismissHints();
   return true;
 }
@@ -440,7 +447,7 @@ function drawSpotWithCat(slot, session, now, workingKittens) {
     // the same number for this cat every time, for whatever a style picks per cat
     seed,
   }, frame);
-  if (focusedThis(session.id)) withFocusOutline(drawCat); else drawCat();
+  if (keyboardFocusedOn(session.id)) withFocusOutline(drawCat); else drawCat();
 }
 
 function workingKittensOf(data, sessionId) {
@@ -483,7 +490,7 @@ function drawScene(advance = true) {
       if (working) {
         kittenPlay.delete(kitten.id);
         const draw = () => ART.drawKittenWorking(pen, place, accent, frame, index, yarnColor);
-        if (focusedThis(kitten.id)) withFocusOutline(draw); else draw();
+        if (keyboardFocusedOn(kitten.id)) withFocusOutline(draw); else draw();
       } else {
         let play = kittenPlay.get(kitten.id);
         if (!play) {
@@ -496,7 +503,7 @@ function drawScene(advance = true) {
         // it just redraws it at wherever it already is this frame.
         if (advance) advanceKittenPlay(play, readings);
         const draw = () => ART.drawKittenPlaying(pen, play, accent, frame, yarnColor);
-        if (focusedThis(kitten.id)) withFocusOutline(draw); else draw();
+        if (keyboardFocusedOn(kitten.id)) withFocusOutline(draw); else draw();
       }
     });
   }
@@ -705,7 +712,7 @@ function renderOverlay(data) {
     if (!seenSids.has(sid)) {
       el.remove();
       hoverTargetBySid.delete(sid);
-      if (rovingId === sid) { rovingId = null; overlayHasFocus = false; }
+      if (rovingId === sid) { rovingId = null; overlayHasFocus = false; keyboardFocused = false; }
     }
   applyRovingTabindex();
 }
@@ -798,6 +805,7 @@ function rovingMove(direction) {
     if (dist < bestDist) { bestDist = dist; best = el; }
   }
   if (!best) return;
+  keyboardFocusPending = true;   // only called from the keydown handler below: always keyboard
   best.focus({preventScroll: true});
 }
 
@@ -833,6 +841,7 @@ function activateHint(key) {
   const index = HINT_KEYS.indexOf(key);
   if (index < 0 || index >= targets.length) return;
   dismissHints();
+  keyboardFocusPending = true;
   targets[index].focus({preventScroll: true});
 }
 
@@ -1091,22 +1100,35 @@ hoverTargets.addEventListener("mouseout", (event) => {
 });
 
 // ------------------------------------------------------------ keyboard navigation
+// A mousedown/pointerdown always precedes the focus a click causes — marking the *next*
+// focus as pointer-driven here, ahead of it, is how a click is told apart from a Tab or an
+// arrow move (which mark it keyboard-driven themselves: the keydown handler below, and
+// rovingMove/activateHint above). Nothing here changes what a click already does.
+hoverTargets.addEventListener("pointerdown", () => { keyboardFocusPending = false; });
+
 hoverTargets.addEventListener("focusin", (event) => {
   const el = event.target;
   if (!el || !el.dataset || !el.dataset.sid) return;
   rovingId = el.dataset.sid;
   overlayHasFocus = true;
+  const byKeyboard = keyboardFocusPending;
+  keyboardFocusPending = false;
+  keyboardFocused = byKeyboard;
   applyRovingTabindex();
-  showHovercard(el);
-  drawScene();
+  // A mouse click already shows the hovercard via "mouseover" (it always fires first, as
+  // the pointer lands on the target) and leaves it exactly as main does — this only adds
+  // the card, and the repaint for the outline, for a focus that arrived by keyboard.
+  if (byKeyboard) { showHovercard(el); drawScene(false); }
 });
 hoverTargets.addEventListener("focusout", () => {
+  const wasKeyboard = keyboardFocused;
   overlayHasFocus = false;
-  hovercard.style.display = "none";
-  drawScene();
+  keyboardFocused = false;
+  if (wasKeyboard) { hovercard.style.display = "none"; drawScene(false); }
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Tab") keyboardFocusPending = true;   // consumed by the focusin it causes
   const eventTarget = event.target;
   if (eventTarget && (eventTarget.tagName === "INPUT" || eventTarget.tagName === "TEXTAREA")) return;
   if (hintsActive) {
@@ -1128,13 +1150,15 @@ document.addEventListener("keydown", (event) => {
     if (current && gladeLink) gladeLink.open(current.dataset.task, current.dataset.subagent || null);
     return;
   }
-  // f jumps into the group with a letter hint on each target — not while already in it.
-  if (event.key.toLowerCase() === "f" && !event.ctrlKey && !event.metaKey && !event.altKey &&
-      !overlayHasFocus) {
+  // f, arrows, Enter/Space and this Escape only ever act with focus already in the group
+  // (Tab, native, gets it there): never on a page — or VS Code webview host — that happens
+  // to share a key with ours, and never for a mouse-only user, who never presses any of them.
+  if (overlayHasFocus && event.key.toLowerCase() === "f" &&
+      !event.ctrlKey && !event.metaKey && !event.altKey) {
     event.preventDefault();
     showHints();
   }
-  if (event.key === "Escape") {
+  if (overlayHasFocus && event.key === "Escape") {
     event.preventDefault();
     const current = hoverTargetBySid.get(rovingId);
     if (current) current.blur();
