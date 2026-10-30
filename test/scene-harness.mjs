@@ -97,19 +97,6 @@ function flatten(layers) {
   return out;
 }
 
-// ------------------------------------------------------------------ the page
-function makeElement() {
-  const classes = new Set();
-  return {
-    style: {}, dataset: {}, hidden: false, textContent: "", innerHTML: "",
-    clientWidth: 1440, offsetHeight: 40,
-    classList: {add: (c) => classes.add(c), remove: (c) => classes.delete(c),
-                contains: (c) => classes.has(c)},
-    addEventListener() {}, querySelectorAll() { return []; },
-    getBoundingClientRect() { return {left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0}; },
-  };
-}
-
 /** A seeded Math: the scene's only randomness is the kittens' yarn. */
 function seededMath(seed) {
   let state = seed >>> 0;
@@ -140,13 +127,113 @@ export function loadScene({scripts, snapshot, box = {width: 1440, height: 720}, 
   const canvas = makeCanvas(720, 360, {...box});
   const actors = makeCanvas(720, 360, canvas.box);
   const elements = {scene: canvas, actors};
+
+  // ---------------------------------------------------------------- a tiny real-enough DOM
+  // Just enough of Element/Document for app.js's keyboard code to run for real: nodes with
+  // attributes, a parent chain events bubble along, and a notion of which one has focus — so
+  // the same roving-tabindex/hint/outline code that runs in a browser runs here too.
+  const fakeDocument = {activeElement: null};
+  const docListeners = {};
+
+  function dispatch(node, type, props = {}) {
+    const event = {type, target: node, bubbles: true, defaultPrevented: false,
+      preventDefault() { this.defaultPrevented = true; }, ...props};
+    let at = node;
+    while (at) {
+      for (const fn of (at._listeners[type] || []).slice()) fn(event);
+      at = event.bubbles ? at.parentNode : null;
+    }
+    return event;
+  }
+
+  function makeNode(tag) {
+    const classes = new Set();
+    const attrs = {};
+    const node = {
+      tagName: String(tag || "div").toUpperCase(),
+      parentNode: null, children: [], _listeners: {}, _innerHTML: "",
+      style: {}, dataset: {}, hidden: false, textContent: "",
+      clientWidth: 1440, offsetHeight: 40,
+      get className() { return [...classes].join(" "); },
+      set className(value) { classes.clear(); String(value).split(/\s+/).filter(Boolean).forEach((c) => classes.add(c)); },
+      classList: {
+        add: (c) => classes.add(c), remove: (c) => classes.delete(c),
+        contains: (c) => classes.has(c),
+      },
+      setAttribute(name, value) { attrs[name] = String(value); },
+      getAttribute(name) { return name in attrs ? attrs[name] : null; },
+      removeAttribute(name) { delete attrs[name]; },
+      appendChild(child) { child.parentNode = node; node.children.push(child); return child; },
+      removeChild(child) {
+        const i = node.children.indexOf(child);
+        if (i >= 0) node.children.splice(i, 1);
+        child.parentNode = null;
+        return child;
+      },
+      remove() { if (node.parentNode) node.parentNode.removeChild(node); },
+      addEventListener(type, fn) { (node._listeners[type] ||= []).push(fn); },
+      removeEventListener(type, fn) {
+        if (node._listeners[type]) node._listeners[type] = node._listeners[type].filter((f) => f !== fn);
+      },
+      dispatchEvent(type, props) { return dispatch(node, type, props); },
+      closest(selector) {
+        const cls = selector[0] === "." ? selector.slice(1) : null;
+        for (let at = node; at; at = at.parentNode)
+          if (cls && at.classList && at.classList.contains(cls)) return at;
+        return null;
+      },
+      getBoundingClientRect() {
+        const left = parseFloat(node.style.left) || 0, top = parseFloat(node.style.top) || 0;
+        const width = parseFloat(node.style.width) || 0, height = parseFloat(node.style.height) || 0;
+        return {left, top, width, height, right: left + width, bottom: top + height};
+      },
+      focus(opts) {
+        if (fakeDocument.activeElement === node) return;
+        const previous = fakeDocument.activeElement;
+        fakeDocument.activeElement = node;
+        if (previous) dispatch(previous, "focusout");
+        dispatch(node, "focusin", {relatedTarget: previous || null, opts});
+      },
+      blur() {
+        if (fakeDocument.activeElement !== node) return;
+        fakeDocument.activeElement = null;
+        dispatch(node, "focusout");
+      },
+      querySelectorAll() { return []; },
+      get outerHTML() {
+        const tag2 = node.tagName.toLowerCase();
+        const pieces = [`<${tag2}`];
+        if (classes.size) pieces.push(` class="${[...classes].join(" ")}"`);
+        for (const [name, value] of Object.entries(attrs)) pieces.push(` ${name}="${value}"`);
+        for (const [key, value] of Object.entries(node.dataset))
+          if (value !== undefined) pieces.push(` data-${key}="${value}"`);
+        const styleText = Object.entries(node.style)
+          .filter(([, v]) => v !== "" && v != null)
+          .map(([k, v]) => `${k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}:${v}`).join(";");
+        if (styleText) pieces.push(` style="${styleText}"`);
+        pieces.push(`>${node.innerHTML}</${tag2}>`);
+        return pieces.join("");
+      },
+      get innerHTML() {
+        return node.children.length ? node.children.map((c) => c.outerHTML).join("") : node._innerHTML;
+      },
+      set innerHTML(value) { node._innerHTML = value; node.children = []; },
+    };
+    return node;
+  }
+
   const sandbox = {
     console, Date: FakeDate, Math: seededMath(20261002), JSON, Promise, Map, Set, Object, Array,
     String, Number, Infinity, NaN, parseFloat, parseInt, isNaN, AbortController, URLSearchParams,
     document: {
       hidden: false, documentElement: {dataset: {}},
-      getElementById(id) { return elements[id] || (elements[id] = makeElement()); },
-      addEventListener() {},
+      get activeElement() { return fakeDocument.activeElement; },
+      getElementById(id) { return elements[id] || (elements[id] = makeNode("div")); },
+      createElement(tag) { return makeNode(tag); },
+      addEventListener(type, fn) { (docListeners[type] ||= []).push(fn); },
+      removeEventListener(type, fn) {
+        if (docListeners[type]) docListeners[type] = docListeners[type].filter((f) => f !== fn);
+      },
     },
     navigator: {userAgent: "scene harness (node)", sendBeacon() { return true; }},
     location: {search, reload() { clock.problems.push("location.reload was called"); }},
@@ -187,11 +274,24 @@ export function loadScene({scripts, snapshot, box = {width: 1440, height: 720}, 
       const text = elements["corner-text"] ? elements["corner-text"].textContent : "";
       if (/render error|disconnected/.test(text)) clock.problems.push(`${seconds()}s: ${text}`);
     },
-    /** A short hash of everything the user would see: the canvas and the overlay's HTML. */
+    /**
+     * Dispatches a synthetic keydown on `document`, as a key press would: `target` defaults
+     * to a plain, non-input element so the "ignore keys while typing" guard doesn't trip.
+     */
+    keydown(props = {}) {
+      const event = {type: "keydown", target: {tagName: "BODY"}, bubbles: true,
+        ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; }, ...props};
+      for (const fn of (docListeners.keydown || []).slice()) fn(event);
+      return event;
+    },
+    /** A short hash of everything the user would see: both canvas layers, the overlay's HTML
+     *  and the keyboard/hover targets' markup — so a regression in either is caught. */
     hash() {
       const overlay = elements.overlay ? elements.overlay.innerHTML : "";
+      const targets = elements["hover-targets"] ? elements["hover-targets"].innerHTML : "";
       return createHash("sha1").update(`${canvas.width}x${canvas.height}`)
-        .update(flatten([canvas, actors])).update(overlay).digest("hex").slice(0, 12);
+        .update(flatten([canvas, actors])).update(overlay).update(targets).digest("hex").slice(0, 12);
     },
     /** Each layer on its own as a PNG (the room, and what stands in it), to stack under and
      *  over the overlay as the page does. */
